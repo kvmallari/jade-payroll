@@ -25,6 +25,7 @@ class Employee extends Model
         'civil_status',
         'phone',
         'address',
+        'postal_code',
         'hire_date',
         'paid_leaves',
         'benefits_status',

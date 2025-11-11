@@ -3,19 +3,13 @@
 namespace App\Services;
 
 use App\Models\Employee;
-use App\Models\PayrollDetail;
 use App\Models\PayrollSnapshot;
-use App\Models\Payroll;
 use App\Models\EmployerSetting;
+use App\Models\BIR2316Setting;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Writer\Csv;
 use PhpOffice\PhpSpreadsheet\Writer\Pdf\Mpdf;
-use PhpOffice\PhpSpreadsheet\Settings;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Http\Response;
 use ZipArchive;
 use mikehaertl\pdftk\Pdf;
 
@@ -112,6 +106,7 @@ class BIR2316TemplateService
             'address' => $employerSettings->registered_address ?? 'N/A',
             'zip_code' => $employerSettings->postal_zip_code ?? 'N/A',
             'rdo_code' => $employerSettings->rdo_code ?? 'N/A',
+            'signatory_name' => $employerSettings->signatory_name ?? 'N/A',
         ];
 
         $totals['employee'] = [
@@ -265,20 +260,45 @@ class BIR2316TemplateService
 
             // Try to replicate exactly what works in your standalone script
             // Use the same approach: basic fields with simple data
-            $basicTestData = [
-                'year' => (string)$year,
-                'employee_name' => strtoupper($employee->first_name . ' ' . $employee->last_name),
-            ];
 
-            Log::info('Trying basic approach like working test script', ['basic_data' => $basicTestData]);
+            // Parse TIN for basic test (max 14 characters)
+            $tinParts = [];
+            if ($employee->tin_number) {
+                $tin = substr(preg_replace('/[^0-9A-Za-z]/', '', $employee->tin_number), 0, 14);
+                if (strlen($tin) >= 9) {
+                    $tinParts = [
+                        substr($tin, 0, 3),  // First 3 characters
+                        substr($tin, 3, 3),  // Next 3 characters  
+                        substr($tin, 6, 3),  // Next 3 characters
+                        substr($tin, 9)      // Remaining characters (up to 5)
+                    ];
+                }
+            }
+
+            // Parse employer TIN for basic test (max 14 characters)
+            $employerTinParts = [];
+            if (isset($data['employer']['tin'])) {
+                $employerTin = substr(preg_replace('/[^0-9A-Za-z]/', '', $data['employer']['tin']), 0, 14);
+                if (strlen($employerTin) >= 9) {
+                    $employerTinParts = [
+                        substr($employerTin, 0, 3),  // First 3 characters
+                        substr($employerTin, 3, 3),  // Next 3 characters  
+                        substr($employerTin, 6, 3),  // Next 3 characters
+                        substr($employerTin, 9)      // Remaining characters (up to 5)
+                    ];
+                }
+            }
+
+            // Use the complete form data that includes BIR 2316 settings
+            Log::info('Using complete form data with BIR 2316 settings', ['form_data_count' => count($formData)]);
 
             // Skip the library entirely and use direct PDFtk execution
             // This replicates exactly what works in your standalone script
             $result = false;
 
             try {
-                // Create a simple FDF file manually (like your working script)
-                $fdfContent = $this->createSimpleFDF($basicTestData);
+                // Create a simple FDF file manually (like your working script) using complete form data
+                $fdfContent = $this->createSimpleFDF($formData);
                 $fdfPath = storage_path('app/temp/simple_form_data.fdf');
 
                 // Ensure temp directory exists
@@ -340,7 +360,7 @@ class BIR2316TemplateService
 
             if (!$result) {
                 Log::error('PDFtk library approach failed for employee: ' . $employee->employee_number, [
-                    'basic_data' => $basicTestData,
+                    'form_data_count' => count($formData),
                     'template_exists' => file_exists($this->pdfTemplatePath),
                     'template_size' => file_exists($this->pdfTemplatePath) ? filesize($this->pdfTemplatePath) : 0
                 ]);
@@ -349,7 +369,7 @@ class BIR2316TemplateService
                 Log::info('Using empty template as fallback');
             } else {
                 Log::info('PDF filling succeeded for employee: ' . $employee->employee_number, [
-                    'data_filled' => $basicTestData,
+                    'form_data_fields' => count($formData),
                     'output_size' => filesize($outputPath)
                 ]);
             }
@@ -453,37 +473,43 @@ class BIR2316TemplateService
      */
     private function preparePDFFormData(Employee $employee, $data, $year)
     {
-        // Parse TIN number for individual field mapping
+        // Retrieve BIR 2316 settings for the tax year
+        $birSettings = BIR2316Setting::where('tax_year', $year)->first();
+
+        // Parse TIN number for individual field mapping (max 14 characters)
         $tinParts = [];
         if ($employee->tin_number) {
-            $tin = preg_replace('/[^0-9]/', '', $employee->tin_number); // Remove non-numeric characters
+            // Keep only alphanumeric characters, max 14 chars
+            $tin = substr(preg_replace('/[^0-9A-Za-z]/', '', $employee->tin_number), 0, 14);
+
             if (strlen($tin) >= 9) {
                 $tinParts = [
-                    str_pad(substr($tin, 0, 3), 3, '0', STR_PAD_LEFT),
-                    str_pad(substr($tin, 3, 3), 3, '0', STR_PAD_LEFT),
-                    str_pad(substr($tin, 6, 3), 3, '0', STR_PAD_LEFT),
-                    str_pad(substr($tin, 9, 3), 5, '0', STR_PAD_LEFT)
+                    substr($tin, 0, 3),  // First 3 characters
+                    substr($tin, 3, 3),  // Next 3 characters  
+                    substr($tin, 6, 3),  // Next 3 characters
+                    substr($tin, 9)      // Remaining characters (up to 5)
                 ];
             }
         }
 
-        // Parse employer TIN for individual field mapping
+        // Parse employer TIN for individual field mapping (max 14 characters)
         $employerTinParts = [];
         if (isset($data['employer']['tin'])) {
-            $employerTin = preg_replace('/[^0-9]/', '', $data['employer']['tin']);
+            // Keep only alphanumeric characters, max 14 chars (same as employee TIN format)
+            $employerTin = substr(preg_replace('/[^0-9A-Za-z]/', '', $data['employer']['tin']), 0, 14);
             if (strlen($employerTin) >= 9) {
                 $employerTinParts = [
-                    str_pad(substr($employerTin, 0, 3), 3, '0', STR_PAD_LEFT),
-                    str_pad(substr($employerTin, 3, 3), 3, '0', STR_PAD_LEFT),
-                    str_pad(substr($employerTin, 6, 3), 3, '0', STR_PAD_LEFT),
-                    str_pad(substr($employerTin, 9, 3), 5, '0', STR_PAD_LEFT)
+                    substr($employerTin, 0, 3),  // First 3 characters
+                    substr($employerTin, 3, 3),  // Next 3 characters  
+                    substr($employerTin, 6, 3),  // Next 3 characters
+                    substr($employerTin, 9)      // Remaining characters (up to 5)
                 ];
             }
         }
 
         $formData = [
-            // Year field
-            'year' => (string)$year,
+            // Year field - ensure max 4 characters
+            'year' => substr((string)$year, -4),
 
             // Employee TIN (broken down into parts as per PDF form structure)
             'employee_tin_1' => $tinParts[0] ?? '',
@@ -491,69 +517,189 @@ class BIR2316TemplateService
             'employee_tin_3' => $tinParts[2] ?? '',
             'employee_tin_4' => $tinParts[3] ?? '',
 
-            // Employee Information
-            'employee_name' => strtoupper(trim($employee->first_name . ' ' . ($employee->middle_name ?? '') . ' ' . $employee->last_name)),
-            'employee_registered_address' => $employee->address ?? '',
-            'employee_local_address' => $employee->address ?? '', // Use same address for local
-            'employee_contactnumber' => $employee->phone_number ?? '',
+            // Employee Information - Format: "Last Name, First Name, Middle Name"
+            'employee_name' => $this->formatEmployeeName($employee),
+
+            // Employee fields from employees table
+            'employee_local_address' => $employee->address ?? '', // 'address' column
+            'employee_birthday' => $employee->birth_date ? Carbon::parse($employee->birth_date)->format('mdY') : '', // 'birth_date' column - no slashes: 05232003
+            'employee_contactnumber' => $employee->phone ?? '', // 'phone' column
             'employee_id' => $employee->employee_number ?? '',
 
-            // Employee address zip code
-            'employee_registered_address_zip' => $data['employer']['zip_code'] ?? '',
-            'employee_local_address_zip' => $data['employer']['zip_code'] ?? '',
+            // Employee signature name - different format: 'FIRST MIDDLE LAST'
+            'employee_name_signature' => $this->formatEmployeeNameSignature($employee), // Field 54 and 56 format
 
-            // RDO Code
-            'rdo' => $data['employer']['rdo_code'] ?? '',
+            'employee_local_address_zip' => $employee->postal_code ?? '',
 
-            // Present Employer Information
+            // Employer fields from employers_settings table
+            'rdo' => $data['employer']['rdo_code'] ?? '', // 'rdo_code' column
+
+            // Present Employer TIN from employers_settings.tax_identification_number
             'employer_present_tin_1' => $employerTinParts[0] ?? '',
             'employer_present_tin_2' => $employerTinParts[1] ?? '',
             'employer_present_tin_3' => $employerTinParts[2] ?? '',
             'employer_present_tin_4' => $employerTinParts[3] ?? '',
-            'employer_name_present' => strtoupper($data['employer']['name'] ?? ''),
-            'employer_registered_address_present' => $data['employer']['address'] ?? '',
-            'employer_registered_address_zip_present' => $data['employer']['zip_code'] ?? '',
+
+            // Employer information from employers_settings table
+            'employer_name_present' => $data['employer']['name'] ?? '', // 'registered_business_name' column
+            'employer_registered_address_present' => $data['employer']['address'] ?? '', // 'registered_address' column
+            'employer_registered_address_zip_present' => $data['employer']['zip_code'] ?? '', // 'postal_zip_code' column
+
+            // Authorized signature from employers_settings table
+            'authorized_signature' => $data['employer']['signatory_name'] ?? '', // 'signatory_name' column
 
             // Main employer checkbox - use 'Yes' for checkbox fields
             'main_employer' => 'Yes',
+            'mwe' => 'Yes',
+
 
             // Periods (using string format)
             'period_from' => (string)$year,
             'period_to' => (string)$year,
 
-            // Compensation amounts (using the numbered fields from BIR form)
-            // Remove number_format to avoid any formatting issues, use raw numbers with 2 decimal places
-            '19' => sprintf('%.2f', $data['gross_compensation']), // Gross Compensation Income from Present
-            '20' => sprintf('%.2f', $data['non_taxable_13th_month'] + ($data['non_taxable_de_minimis'] ?? 0)), // Non-taxable income
-            '21' => sprintf('%.2f', $data['taxable_compensation']), // Taxable Compensation Income from Present
-            '23' => sprintf('%.2f', $data['taxable_compensation']), // Gross Taxable Compensation Income
-            '24' => sprintf('%.2f', $data['tax_withheld']), // Tax Withheld from Present Employer
-            '26' => sprintf('%.2f', $data['tax_withheld']), // Total Amount of Taxes Withheld
-            '28' => sprintf('%.2f', $data['tax_withheld']), // Total Taxes Withheld
+            // // Compensation amounts (using the numbered fields from BIR form)
+            // // Remove number_format to avoid any formatting issues, use raw numbers with 2 decimal places
+            // '19' => sprintf('%.2f', $data['gross_compensation']), // Gross Compensation Income from Present
+            // '20' => sprintf('%.2f', $data['non_taxable_13th_month'] + ($data['non_taxable_de_minimis'] ?? 0)), // Non-taxable income
+            // '21' => sprintf('%.2f', $data['taxable_compensation']), // Taxable Compensation Income from Present
+            // '23' => sprintf('%.2f', $data['taxable_compensation']), // Gross Taxable Compensation Income
+            // '24' => sprintf('%.2f', $data['tax_withheld']), // Tax Withheld from Present Employer
+            // '26' => sprintf('%.2f', $data['tax_withheld']), // Total Amount of Taxes Withheld
+            // '28' => sprintf('%.2f', $data['tax_withheld']), // Total Taxes Withheld
 
-            // Detailed compensation breakdown
-            '29' => sprintf('%.2f', $data['basic_salary']), // Basic Salary
-            '30' => sprintf('%.2f', $data['overtime_pay'] ?? 0), // Overtime pay
-            '31' => sprintf('%.2f', $data['night_differential'] ?? 0), // Night differential
-            '32' => sprintf('%.2f', $data['holiday_pay'] ?? 0), // Holiday pay
-            '33' => sprintf('%.2f', $data['allowances'] ?? 0), // Allowances
-            '34' => sprintf('%.2f', $data['bonuses'] ?? 0), // Bonuses
-            '35' => sprintf('%.2f', $data['incentives'] ?? 0), // Other compensation
+            // // Detailed compensation breakdown
+            // '29' => sprintf('%.2f', $data['basic_salary']), // Basic Salary
 
-            // Mandatory contributions
-            '36' => sprintf('%.2f', $data['total_contributions']), // SSS, GSIS, PHIC & PAG-IBIG Contributions
-            '37' => sprintf('%.2f', $data['gross_compensation']), // Salaries and Other Forms of Compensation
-            '38' => sprintf('%.2f', $data['non_taxable_13th_month'] + ($data['non_taxable_de_minimis'] ?? 0)), // Total Non-Taxable/Exempt
+            // // Mandatory contributions
+            // '36' => sprintf('%.2f', $data['total_contributions']), // SSS, GSIS, PHIC & PAG-IBIG Contributions
+            // '37' => sprintf('%.2f', $data['gross_compensation']), // Salaries and Other Forms of Compensation
+            // '38' => sprintf('%.2f', $data['non_taxable_13th_month'] + ($data['non_taxable_de_minimis'] ?? 0)), // Total Non-Taxable/Exempt
 
-            // Signature fields
-            'employee_name_signature' => strtoupper(trim($employee->first_name . ' ' . ($employee->middle_name ?? '') . ' ' . $employee->last_name)),
-            'date_issued' => now()->format('m/d/Y'),
-
-            // Employee birthday and other date fields (if available)
-            'employee_birthday' => $employee->birth_date ? Carbon::parse($employee->birth_date)->format('m/d/Y') : '',
+            // Date fields and BIR Settings integration
+            'date_issued' => $birSettings && $birSettings->date_issued
+                ? Carbon::parse($birSettings->date_issued)->format('mdY')
+                : now()->format('mdY'),
         ];
 
+        // Only add detailed compensation fields if they have actual values (> 0)
+        if (($data['overtime_pay'] ?? 0) > 0) {
+            $formData['30'] = sprintf('%.2f', $data['overtime_pay']);
+        }
+        if (($data['night_differential'] ?? 0) > 0) {
+            $formData['31'] = sprintf('%.2f', $data['night_differential']);
+        }
+        if (($data['holiday_pay'] ?? 0) > 0) {
+            $formData['32'] = sprintf('%.2f', $data['holiday_pay']);
+        }
+        if (($data['allowances'] ?? 0) > 0) {
+            $formData['33'] = sprintf('%.2f', $data['allowances']);
+        }
+        if (($data['bonuses'] ?? 0) > 0) {
+            $formData['34'] = sprintf('%.2f', $data['bonuses']);
+        }
+        if (($data['incentives'] ?? 0) > 0) {
+            $formData['35'] = sprintf('%.2f', $data['incentives']);
+        }
+
+        // // Add mandatory contributions and other required fields
+        // $formData['36'] = sprintf('%.2f', $data['total_contributions']); // SSS, GSIS, PHIC & PAG-IBIG Contributions
+        // $formData['37'] = sprintf('%.2f', $data['gross_compensation']); // Salaries and Other Forms of Compensation
+        // $formData['38'] = sprintf('%.2f', $data['non_taxable_13th_month'] + ($data['non_taxable_de_minimis'] ?? 0)); // Total Non-Taxable/Exempt
+
+        // Date fields and BIR Settings integration
+        $formData['date_issued'] = $birSettings && $birSettings->date_issued
+            ? Carbon::parse($birSettings->date_issued)->format('mdY')
+            : now()->format('mdY');
+
+        // Add BIR 2316 settings fields if available
+        if ($birSettings) {
+            // Employee rate per day from statutory minimum wage - no decimal places
+            if ($birSettings->statutory_minimum_wage_per_day) {
+                $formData['employee_rateperday'] = number_format($birSettings->statutory_minimum_wage_per_day, 0, '', '');
+            }
+
+            // Employee rate per month from statutory minimum wage - no decimal places
+            if ($birSettings->statutory_minimum_wage_per_month) {
+                $formData['employee_ratepermonth'] = number_format($birSettings->statutory_minimum_wage_per_month, 0, '', '');
+            }
+
+            // Period from and to - remove hyphens from MM-DD format
+            if ($birSettings->period_from) {
+                $formData['period_from'] = str_replace('-', '', $birSettings->period_from);
+            }
+            if ($birSettings->period_to) {
+                $formData['period_to'] = str_replace('-', '', $birSettings->period_to);
+            }
+
+            // Place of issue
+            if ($birSettings->place_of_issue) {
+                $formData['place_of_issue'] = $birSettings->place_of_issue;
+            }
+
+            // Amount paid CTC
+            if ($birSettings->amount_paid_ctc) {
+                $formData['amount_paid_ctc'] = sprintf('%.2f', $birSettings->amount_paid_ctc);
+            }
+
+            // Authorized person signature date - format from Y-m-d to mmddyyyy
+            if ($birSettings->date_signed_by_authorized_person) {
+                $formData['authorized_signature_date_signed'] = Carbon::parse($birSettings->date_signed_by_authorized_person)->format('mdY');
+            }
+
+            // Employee signature date - format from Y-m-d to mmddyyyy  
+            if ($birSettings->date_signed_by_employee) {
+                $formData['employee_signature_date_signed'] = Carbon::parse($birSettings->date_signed_by_employee)->format('mdY');
+            }
+        }
+
         return $formData;
+    }
+
+    /**
+     * Format employee name as "Last Name, First Name, Middle Name"
+     */
+    private function formatEmployeeName(Employee $employee)
+    {
+        $lastName = trim($employee->last_name ?? '');
+        $firstName = trim($employee->first_name ?? '');
+        $middleName = trim($employee->middle_name ?? '');
+
+        // Start with last name, first name
+        $formattedName = $lastName . ', ' . $firstName;
+
+        // Add middle name if available
+        if (!empty($middleName)) {
+            $formattedName .= ', ' . $middleName;
+        }
+
+        return $formattedName;
+    }
+
+    /**
+     * Format employee name for signature as "FIRST MIDDLE LAST"
+     * If employee_name format is "Mallari, King Viel, Labro", 
+     * then signature format is "KING VIEL LABRO MALLARI"
+     */
+    private function formatEmployeeNameSignature(Employee $employee)
+    {
+        $lastName = trim($employee->last_name ?? '');
+        $firstName = trim($employee->first_name ?? '');
+        $middleName = trim($employee->middle_name ?? '');
+
+        // Format as "First Middle Last" (original case preserved)
+        $signatureName = $firstName;
+
+        // Add middle name if available
+        if (!empty($middleName)) {
+            $signatureName .= ' ' . $middleName;
+        }
+
+        // Add last name at the end
+        if (!empty($lastName)) {
+            $signatureName .= ' ' . $lastName;
+        }
+
+        return trim($signatureName);
     }
 
     /**
@@ -595,10 +741,10 @@ class BIR2316TemplateService
             $pdf = new Pdf($this->pdfTemplatePath);
 
             // Set options to prevent drop_xfa
-            $pdf->setOptions([
-                'flatten' => false,
-                'drop_xfa' => false
-            ]);
+            // $pdf->setOptions([
+            //     'flatten' => false,
+            //     'drop_xfa' => false
+            // ]);
 
             $result = $pdf->fillForm($formData)->saveAs($outputPath);
 
@@ -814,6 +960,175 @@ class BIR2316TemplateService
         } catch (\Exception $e) {
             Log::error('Error generating PDF for all employees: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to generate PDF: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Download all employees' forms as filled PDF files in a ZIP archive.
+     * Each employee gets their own filled PDF with populated payroll data.
+     */
+    public function downloadAllFilledPDF($employees, $year)
+    {
+        try {
+            // Create a ZIP archive containing filled PDF files for each employee
+            $zipFilename = "BIR_2316_FILLED_EMPLOYEES_{$year}.zip";
+            $zipPath = storage_path('app/temp/' . $zipFilename);
+
+            // Ensure temp directory exists
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0755, true);
+            }
+
+            // Initialize ZIP archive
+            $zip = new \ZipArchive();
+            if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== TRUE) {
+                throw new \Exception('Cannot create ZIP file');
+            }
+
+            foreach ($employees as $employee) {
+                try {
+                    // Generate filled PDF for each employee
+                    $lastName = strtoupper($employee->last_name);
+                    $firstName = strtoupper($employee->first_name);
+                    $middleName = $employee->middle_name ? strtoupper($employee->middle_name) : '';
+
+                    $fullName = $middleName ? "{$lastName}_{$firstName}_{$middleName}" : "{$lastName}_{$firstName}";
+                    $individualFilename = "BIR_2316_FILLED_{$fullName}_{$year}.pdf";
+                    $tempIndividualPath = storage_path('app/temp/' . $individualFilename);
+
+                    // Generate the filled PDF using our existing method
+                    $data = $this->generateEmployeeData($employee, $year);
+                    $formData = $this->preparePDFFormData($employee, $data, $year);
+
+                    // Try to create filled PDF using complete form data (includes BIR 2316 settings)
+                    $result = false;
+                    try {
+                        // Create a simple FDF file manually using complete form data
+                        $fdfContent = $this->createSimpleFDF($formData);
+                        $fdfPath = storage_path('app/temp/simple_form_data.fdf');
+                        file_put_contents($fdfPath, $fdfContent);
+
+                        // Use PDFtk to fill the form
+                        $pdftk = 'C:\Program Files (x86)\PDFtk\bin\pdftk.exe';
+                        $command = sprintf(
+                            '"%s" "%s" fill_form "%s" output "%s"',
+                            $pdftk,
+                            $this->pdfTemplatePath,
+                            $fdfPath,
+                            $tempIndividualPath
+                        );
+
+                        exec($command . ' 2>&1', $output, $returnCode);
+
+                        if ($returnCode === 0 && file_exists($tempIndividualPath) && filesize($tempIndividualPath) > 0) {
+                            $result = true;
+                        }
+
+                        // Clean up FDF file
+                        if (file_exists($fdfPath)) {
+                            unlink($fdfPath);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to create filled PDF for employee: ' . $employee->employee_number . '. Error: ' . $e->getMessage());
+                    }
+
+                    // If filling failed, use empty template
+                    if (!$result) {
+                        copy($this->pdfTemplatePath, $tempIndividualPath);
+                    }
+
+                    // Add to ZIP
+                    if (file_exists($tempIndividualPath)) {
+                        $zip->addFile($tempIndividualPath, $individualFilename);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Error processing employee ' . $employee->employee_number . ': ' . $e->getMessage());
+                    // Continue with next employee
+                }
+            }
+
+            $zip->close();
+
+            // Clean up individual files
+            foreach ($employees as $employee) {
+                $lastName = strtoupper($employee->last_name);
+                $firstName = strtoupper($employee->first_name);
+                $middleName = $employee->middle_name ? strtoupper($employee->middle_name) : '';
+
+                $fullName = $middleName ? "{$lastName}_{$firstName}_{$middleName}" : "{$lastName}_{$firstName}";
+                $individualFilename = "BIR_2316_FILLED_{$fullName}_{$year}.pdf";
+                $tempIndividualPath = storage_path('app/temp/' . $individualFilename);
+                if (file_exists($tempIndividualPath)) {
+                    unlink($tempIndividualPath);
+                }
+            }
+
+            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            Log::error('Error generating filled PDF ZIP for all employees: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to generate filled PDF files: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Download all employees' forms as simple PDF files (without FPDI to avoid compression issues).
+     * Creates individual PDF copies for each employee.
+     */
+    public function downloadAllPDFSimple($employees, $year)
+    {
+        try {
+            // Create a ZIP archive containing individual PDF files for each employee
+            $zipFilename = "BIR_2316_EMPLOYEES_{$year}.zip";
+            $zipPath = storage_path('app/temp/' . $zipFilename);
+
+            // Ensure temp directory exists
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0755, true);
+            }
+
+            // Initialize ZIP archive
+            $zip = new \ZipArchive();
+            if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== TRUE) {
+                throw new \Exception('Cannot create ZIP file');
+            }
+
+            foreach ($employees as $employee) {
+                // Create filename for each employee
+                $lastName = strtoupper($employee->last_name);
+                $firstName = strtoupper($employee->first_name);
+                $middleName = $employee->middle_name ? strtoupper($employee->middle_name) : '';
+
+                $fullName = $middleName ? "{$lastName}_{$firstName}_{$middleName}" : "{$lastName}_{$firstName}";
+                $individualFilename = "BIR_2316_{$fullName}_{$year}.pdf";
+                $tempIndividualPath = storage_path('app/temp/' . $individualFilename);
+
+                // Simply copy the template PDF for each employee (avoids FPDI issues)
+                copy($this->pdfTemplatePath, $tempIndividualPath);
+
+                // Add to ZIP
+                $zip->addFile($tempIndividualPath, $individualFilename);
+            }
+
+            $zip->close();
+
+            // Clean up individual files
+            foreach ($employees as $employee) {
+                $lastName = strtoupper($employee->last_name);
+                $firstName = strtoupper($employee->first_name);
+                $middleName = $employee->middle_name ? strtoupper($employee->middle_name) : '';
+
+                $fullName = $middleName ? "{$lastName}_{$firstName}_{$middleName}" : "{$lastName}_{$firstName}";
+                $individualFilename = "BIR_2316_{$fullName}_{$year}.pdf";
+                $tempIndividualPath = storage_path('app/temp/' . $individualFilename);
+                if (file_exists($tempIndividualPath)) {
+                    unlink($tempIndividualPath);
+                }
+            }
+
+            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            Log::error('Error generating simple PDF ZIP for all employees: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to generate PDF files: ' . $e->getMessage()], 500);
         }
     }
 }

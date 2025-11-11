@@ -85,6 +85,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             // BIR Forms
             Route::get('/bir-1601c', [GovernmentFormsController::class, 'bir1601C'])->name('bir-1601c');
             Route::get('/bir-2316', [GovernmentFormsController::class, 'bir2316EmployeeList'])->name('bir-2316.employees');
+            Route::get('/bir-2316/settings', [GovernmentFormsController::class, 'bir2316Settings'])->name('bir-2316.settings');
+            Route::post('/bir-2316/settings', [GovernmentFormsController::class, 'bir2316UpdateSettings'])->name('bir-2316.settings.update');
             Route::post('/bir-2316/generate-summary', [GovernmentFormsController::class, 'bir2316GenerateSummary'])->name('bir-2316.generate-summary');
             Route::get('/bir-2316/{employee}', [GovernmentFormsController::class, 'bir2316Individual'])->name('bir-2316.individual');
             Route::post('/bir-2316/{employee}/generate', [GovernmentFormsController::class, 'bir2316IndividualGenerate'])->name('bir-2316.individual.generate');

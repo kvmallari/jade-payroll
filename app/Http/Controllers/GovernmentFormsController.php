@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\Department;
 use App\Models\Payroll;
 use App\Models\PayrollDetail;
+use App\Models\BIR2316Setting;
 use App\Services\BIR1601CService;
 use App\Services\BIR2316Service;
 use App\Services\BIR2316TemplateService;
@@ -325,8 +326,11 @@ class GovernmentFormsController extends Controller
 
         if ($format === 'excel') {
             return $this->bir2316TemplateService->downloadAllExcel($employees, $year);
+        } elseif ($format === 'filled-pdf') {
+            return $this->bir2316TemplateService->downloadAllFilledPDF($employees, $year);
         } else {
-            return $this->bir2316TemplateService->downloadAllPDF($employees, $year);
+            // For regular PDF, use a simpler method that doesn't use FPDI
+            return $this->bir2316TemplateService->downloadAllPDFSimple($employees, $year);
         }
     }
     /**
@@ -397,5 +401,62 @@ class GovernmentFormsController extends Controller
         $debugResult = $this->bir2316TemplateService->testPDFFormFilling($employee, $year);
 
         return response()->json($debugResult, 200, [], JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * Show BIR 2316 settings page
+     */
+    public function bir2316Settings(Request $request)
+    {
+        // Check if user has proper authorization for government forms settings
+        if (!$request->user()->hasAnyRole(['System Administrator', 'HR Head'])) {
+            abort(403, 'Unauthorized access. Only System Administrator and HR Head can access government forms settings.');
+        }
+
+        // Get current year and last year
+        $currentYear = now()->year;
+        $lastYear = $currentYear - 1;
+
+        // Get selected year from request, default to current year
+        $selectedYear = $request->get('year', $currentYear);
+
+        // Get settings for the selected year
+        $settings = BIR2316Setting::getOrCreateForYear($selectedYear);
+
+        return view('government-forms.bir-2316-settings', compact('settings', 'selectedYear', 'currentYear', 'lastYear'));
+    }
+
+    /**
+     * Update BIR 2316 settings
+     */
+    public function bir2316UpdateSettings(Request $request)
+    {
+        // Check if user has proper authorization for government forms settings
+        if (!$request->user()->hasAnyRole(['System Administrator', 'HR Head'])) {
+            abort(403, 'Unauthorized access. Only System Administrator and HR Head can access government forms settings.');
+        }
+
+        $validated = $request->validate([
+            'tax_year' => 'required|integer|min:2020|max:' . (now()->year + 5),
+            'statutory_minimum_wage_per_day' => 'nullable|numeric|min:0|max:99999999.99',
+            'statutory_minimum_wage_per_month' => 'nullable|numeric|min:0|max:99999999.99',
+            'period_from' => 'nullable|string|regex:/^\d{2}-\d{2}$/',
+            'period_to' => 'nullable|string|regex:/^\d{2}-\d{2}$/',
+            'place_of_issue' => 'nullable|string|max:255',
+            'amount_paid_ctc' => 'nullable|numeric|min:0|max:999999999999.99',
+            'date_signed_by_authorized_person' => 'nullable|date',
+            'date_signed_by_employee' => 'nullable|date',
+            'date_issued' => 'nullable|date',
+        ]);
+
+        // Get or create settings for the year
+        $settings = BIR2316Setting::getOrCreateForYear($validated['tax_year']);
+
+        // Update settings
+        $settings->update($validated);
+
+        return redirect()
+            ->route('government-forms.bir-2316.settings', ['year' => $validated['tax_year']])
+            ->with('success', 'BIR 2316 settings updated successfully for year ' . $validated['tax_year']);
     }
 }
