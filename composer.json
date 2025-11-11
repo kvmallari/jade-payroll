@@ -15,6 +15,7 @@
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "maatwebsite/excel": "^3.1",
+        "mikehaertl/php-pdftk": "^0.14.2",
         "mpdf/mpdf": "^8.2",
         "phpoffice/phpspreadsheet": "^1.30",
         "spatie/laravel-activitylog": "^4.10",

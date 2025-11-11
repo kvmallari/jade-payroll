@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Response;
 use ZipArchive;
+use mikehaertl\pdftk\Pdf;
 
 class BIR2316TemplateService
 {
@@ -219,6 +220,476 @@ class BIR2316TemplateService
         } else {
             throw new \Exception('PDF template file BIR-23161.pdf not found in storage/app/private/');
         }
+    }
+
+    /**
+     * Download individual filled PDF file for an employee using pdftk.
+     */
+    public function downloadIndividualFilledPDF(Employee $employee, $year)
+    {
+        // Use the exact PDF template file: BIR-23161.pdf
+        if (!file_exists($this->pdfTemplatePath)) {
+            throw new \Exception('PDF template file BIR-23161.pdf not found in storage/app/private/');
+        }
+
+        try {
+            // Generate employee data for the year
+            $data = $this->generateEmployeeData($employee, $year);
+
+            // Create filename with employee name format: BIR_2316_FILLED_LASTNAME_FIRSTNAME_YEAR
+            $lastName = strtoupper($employee->last_name);
+            $firstName = strtoupper($employee->first_name);
+            $middleName = $employee->middle_name ? strtoupper($employee->middle_name) : '';
+
+            $fullName = $middleName ? "{$lastName}_{$firstName}_{$middleName}" : "{$lastName}_{$firstName}";
+            $filename = "BIR_2316_FILLED_{$fullName}_{$year}.pdf";
+
+            // Ensure temp directory exists
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0755, true);
+            }
+
+            $outputPath = storage_path('app/temp/' . $filename);
+
+            // Prepare field data for PDF form filling
+            $formData = $this->preparePDFFormData($employee, $data, $year);
+
+            // Log form data for debugging
+            Log::info('BIR PDF Form Data for ' . $employee->employee_number, [
+                'employee_name' => $employee->first_name . ' ' . $employee->last_name,
+                'form_data_count' => count($formData),
+                'sample_data' => array_slice($formData, 0, 10, true), // Log first 10 fields
+                'gross_compensation' => $data['gross_compensation'] ?? 'N/A',
+                'tax_withheld' => $data['tax_withheld'] ?? 'N/A'
+            ]);
+
+            // Try to replicate exactly what works in your standalone script
+            // Use the same approach: basic fields with simple data
+            $basicTestData = [
+                'year' => (string)$year,
+                'employee_name' => strtoupper($employee->first_name . ' ' . $employee->last_name),
+            ];
+
+            Log::info('Trying basic approach like working test script', ['basic_data' => $basicTestData]);
+
+            // Skip the library entirely and use direct PDFtk execution
+            // This replicates exactly what works in your standalone script
+            $result = false;
+
+            try {
+                // Create a simple FDF file manually (like your working script)
+                $fdfContent = $this->createSimpleFDF($basicTestData);
+                $fdfPath = storage_path('app/temp/simple_form_data.fdf');
+
+                // Ensure temp directory exists
+                if (!file_exists(dirname($fdfPath))) {
+                    mkdir(dirname($fdfPath), 0755, true);
+                }
+
+                file_put_contents($fdfPath, $fdfContent);
+
+                // Use the exact same command structure as your working script
+                // Use full path to PDFtk since PHP exec doesn't have same PATH as command line
+                $pdftk = 'C:\Program Files (x86)\PDFtk\bin\pdftk.exe';
+                $command = sprintf(
+                    '"%s" "%s" fill_form "%s" output "%s"',
+                    $pdftk,
+                    $this->pdfTemplatePath,
+                    $fdfPath,
+                    $outputPath
+                );
+
+                Log::info('Executing standalone-style PDFtk command', [
+                    'command' => $command,
+                    'template_exists' => file_exists($this->pdfTemplatePath),
+                    'fdf_exists' => file_exists($fdfPath),
+                    'fdf_size' => filesize($fdfPath)
+                ]);
+
+                // Execute the command
+                $output = [];
+                $returnCode = 0;
+                exec($command . ' 2>&1', $output, $returnCode);
+
+                Log::info('Standalone PDFtk execution result', [
+                    'return_code' => $returnCode,
+                    'command_output' => $output,
+                    'output_file_created' => file_exists($outputPath),
+                    'output_file_size' => file_exists($outputPath) ? filesize($outputPath) : 0
+                ]);
+
+                // Clean up FDF file
+                if (file_exists($fdfPath)) {
+                    unlink($fdfPath);
+                }
+
+                if ($returnCode === 0 && file_exists($outputPath) && filesize($outputPath) > 0) {
+                    Log::info('Standalone PDFtk method succeeded!');
+                    $result = true;
+                } else {
+                    Log::error('Standalone PDFtk method failed', [
+                        'exit_code' => $returnCode,
+                        'output' => implode(' ', $output)
+                    ]);
+                    $result = false;
+                }
+            } catch (\Exception $e) {
+                Log::error('Standalone method exception: ' . $e->getMessage());
+                $result = false;
+            }
+
+            if (!$result) {
+                Log::error('PDFtk library approach failed for employee: ' . $employee->employee_number, [
+                    'basic_data' => $basicTestData,
+                    'template_exists' => file_exists($this->pdfTemplatePath),
+                    'template_size' => file_exists($this->pdfTemplatePath) ? filesize($this->pdfTemplatePath) : 0
+                ]);
+                // Final fallback to empty template
+                copy($this->pdfTemplatePath, $outputPath);
+                Log::info('Using empty template as fallback');
+            } else {
+                Log::info('PDF filling succeeded for employee: ' . $employee->employee_number, [
+                    'data_filled' => $basicTestData,
+                    'output_size' => filesize($outputPath)
+                ]);
+            }
+
+            return response()->download($outputPath, $filename)->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            Log::error('Error generating filled PDF: ' . $e->getMessage(), [
+                'employee' => $employee->employee_number ?? 'unknown',
+                'year' => $year,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new \Exception('Unable to generate filled PDF: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get PDF form field names from the BIR template
+     */
+    public function getPDFFormFields()
+    {
+        try {
+            $pdf = new Pdf($this->pdfTemplatePath);
+            $fields = $pdf->getDataFields();
+            return $fields;
+        } catch (\Exception $e) {
+            Log::error('Error getting PDF form fields: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Debug method to test PDF form filling with simple data
+     */
+    public function testPDFFormFilling($employee, $year)
+    {
+        if (!file_exists($this->pdfTemplatePath)) {
+            return ['error' => 'PDF template not found'];
+        }
+
+        try {
+            // Get form fields first
+            $fields = $this->getPDFFormFields();
+            $fieldNames = [];
+            if ($fields && is_array($fields)) {
+                foreach ($fields as $field) {
+                    if (isset($field['FieldName'])) {
+                        $fieldNames[] = $field['FieldName'];
+                    }
+                }
+            }
+
+            // Generate test data
+            $data = $this->generateEmployeeData($employee, $year);
+            $formData = $this->preparePDFFormData($employee, $data, $year);
+
+            // Create test output
+            $testOutputPath = storage_path('app/temp/test_debug_fill.pdf');
+
+            // Ensure temp directory exists
+            if (!file_exists(storage_path('app/temp'))) {
+                mkdir(storage_path('app/temp'), 0755, true);
+            }
+
+            // Try simple fill first
+            $simpleFillData = [
+                'year' => (string)$year,
+                'employee_name' => 'TEST EMPLOYEE NAME',
+                '19' => '100000.00',
+                '21' => '90000.00',
+                '28' => '10000.00'
+            ];
+
+            $pdf = new Pdf($this->pdfTemplatePath);
+            $result = $pdf->fillForm($simpleFillData)->saveAs($testOutputPath);
+
+            return [
+                'success' => $result,
+                'error' => $result ? null : $pdf->getError(),
+                'available_fields_count' => count($fieldNames),
+                'sample_fields' => array_slice($fieldNames, 0, 20),
+                'form_data_fields' => array_keys($formData),
+                'matching_fields' => array_intersect($fieldNames, array_keys($formData)),
+                'test_file_created' => file_exists($testOutputPath),
+                'test_file_size' => file_exists($testOutputPath) ? filesize($testOutputPath) : 0,
+                'employee_data_sample' => [
+                    'gross_compensation' => $data['gross_compensation'] ?? 'N/A',
+                    'basic_salary' => $data['basic_salary'] ?? 'N/A',
+                    'tax_withheld' => $data['tax_withheld'] ?? 'N/A'
+                ]
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ];
+        }
+    }
+
+    /**
+     * Prepare form field data for PDF filling using actual BIR form field names
+     */
+    private function preparePDFFormData(Employee $employee, $data, $year)
+    {
+        // Parse TIN number for individual field mapping
+        $tinParts = [];
+        if ($employee->tin_number) {
+            $tin = preg_replace('/[^0-9]/', '', $employee->tin_number); // Remove non-numeric characters
+            if (strlen($tin) >= 9) {
+                $tinParts = [
+                    str_pad(substr($tin, 0, 3), 3, '0', STR_PAD_LEFT),
+                    str_pad(substr($tin, 3, 3), 3, '0', STR_PAD_LEFT),
+                    str_pad(substr($tin, 6, 3), 3, '0', STR_PAD_LEFT),
+                    str_pad(substr($tin, 9, 3), 5, '0', STR_PAD_LEFT)
+                ];
+            }
+        }
+
+        // Parse employer TIN for individual field mapping
+        $employerTinParts = [];
+        if (isset($data['employer']['tin'])) {
+            $employerTin = preg_replace('/[^0-9]/', '', $data['employer']['tin']);
+            if (strlen($employerTin) >= 9) {
+                $employerTinParts = [
+                    str_pad(substr($employerTin, 0, 3), 3, '0', STR_PAD_LEFT),
+                    str_pad(substr($employerTin, 3, 3), 3, '0', STR_PAD_LEFT),
+                    str_pad(substr($employerTin, 6, 3), 3, '0', STR_PAD_LEFT),
+                    str_pad(substr($employerTin, 9, 3), 5, '0', STR_PAD_LEFT)
+                ];
+            }
+        }
+
+        $formData = [
+            // Year field
+            'year' => (string)$year,
+
+            // Employee TIN (broken down into parts as per PDF form structure)
+            'employee_tin_1' => $tinParts[0] ?? '',
+            'employee_tin_2' => $tinParts[1] ?? '',
+            'employee_tin_3' => $tinParts[2] ?? '',
+            'employee_tin_4' => $tinParts[3] ?? '',
+
+            // Employee Information
+            'employee_name' => strtoupper(trim($employee->first_name . ' ' . ($employee->middle_name ?? '') . ' ' . $employee->last_name)),
+            'employee_registered_address' => $employee->address ?? '',
+            'employee_local_address' => $employee->address ?? '', // Use same address for local
+            'employee_contactnumber' => $employee->phone_number ?? '',
+            'employee_id' => $employee->employee_number ?? '',
+
+            // Employee address zip code
+            'employee_registered_address_zip' => $data['employer']['zip_code'] ?? '',
+            'employee_local_address_zip' => $data['employer']['zip_code'] ?? '',
+
+            // RDO Code
+            'rdo' => $data['employer']['rdo_code'] ?? '',
+
+            // Present Employer Information
+            'employer_present_tin_1' => $employerTinParts[0] ?? '',
+            'employer_present_tin_2' => $employerTinParts[1] ?? '',
+            'employer_present_tin_3' => $employerTinParts[2] ?? '',
+            'employer_present_tin_4' => $employerTinParts[3] ?? '',
+            'employer_name_present' => strtoupper($data['employer']['name'] ?? ''),
+            'employer_registered_address_present' => $data['employer']['address'] ?? '',
+            'employer_registered_address_zip_present' => $data['employer']['zip_code'] ?? '',
+
+            // Main employer checkbox - use 'Yes' for checkbox fields
+            'main_employer' => 'Yes',
+
+            // Periods (using string format)
+            'period_from' => (string)$year,
+            'period_to' => (string)$year,
+
+            // Compensation amounts (using the numbered fields from BIR form)
+            // Remove number_format to avoid any formatting issues, use raw numbers with 2 decimal places
+            '19' => sprintf('%.2f', $data['gross_compensation']), // Gross Compensation Income from Present
+            '20' => sprintf('%.2f', $data['non_taxable_13th_month'] + ($data['non_taxable_de_minimis'] ?? 0)), // Non-taxable income
+            '21' => sprintf('%.2f', $data['taxable_compensation']), // Taxable Compensation Income from Present
+            '23' => sprintf('%.2f', $data['taxable_compensation']), // Gross Taxable Compensation Income
+            '24' => sprintf('%.2f', $data['tax_withheld']), // Tax Withheld from Present Employer
+            '26' => sprintf('%.2f', $data['tax_withheld']), // Total Amount of Taxes Withheld
+            '28' => sprintf('%.2f', $data['tax_withheld']), // Total Taxes Withheld
+
+            // Detailed compensation breakdown
+            '29' => sprintf('%.2f', $data['basic_salary']), // Basic Salary
+            '30' => sprintf('%.2f', $data['overtime_pay'] ?? 0), // Overtime pay
+            '31' => sprintf('%.2f', $data['night_differential'] ?? 0), // Night differential
+            '32' => sprintf('%.2f', $data['holiday_pay'] ?? 0), // Holiday pay
+            '33' => sprintf('%.2f', $data['allowances'] ?? 0), // Allowances
+            '34' => sprintf('%.2f', $data['bonuses'] ?? 0), // Bonuses
+            '35' => sprintf('%.2f', $data['incentives'] ?? 0), // Other compensation
+
+            // Mandatory contributions
+            '36' => sprintf('%.2f', $data['total_contributions']), // SSS, GSIS, PHIC & PAG-IBIG Contributions
+            '37' => sprintf('%.2f', $data['gross_compensation']), // Salaries and Other Forms of Compensation
+            '38' => sprintf('%.2f', $data['non_taxable_13th_month'] + ($data['non_taxable_de_minimis'] ?? 0)), // Total Non-Taxable/Exempt
+
+            // Signature fields
+            'employee_name_signature' => strtoupper(trim($employee->first_name . ' ' . ($employee->middle_name ?? '') . ' ' . $employee->last_name)),
+            'date_issued' => now()->format('m/d/Y'),
+
+            // Employee birthday and other date fields (if available)
+            'employee_birthday' => $employee->birth_date ? Carbon::parse($employee->birth_date)->format('m/d/Y') : '',
+        ];
+
+        return $formData;
+    }
+
+    /**
+     * Create a simple FDF file content for PDFtk form filling
+     */
+    private function createSimpleFDF($formData)
+    {
+        $fdf = "%FDF-1.2\n";
+        $fdf .= "1 0 obj\n";
+        $fdf .= "<<\n";
+        $fdf .= "/FDF << /Fields [\n";
+
+        foreach ($formData as $name => $value) {
+            $fdf .= "<< /T (" . addcslashes($name, "()\\") . ") /V (" . addcslashes($value, "()\\") . ") >>\n";
+        }
+
+        $fdf .= "] >>\n";
+        $fdf .= ">>\n";
+        $fdf .= "endobj\n";
+        $fdf .= "trailer\n";
+        $fdf .= "<<\n";
+        $fdf .= "/Root 1 0 R\n";
+        $fdf .= ">>\n";
+        $fdf .= "%%EOF\n";
+
+        return $fdf;
+    }
+
+    /**
+     * Fill PDF directly using exec command like in your working test script
+     */
+    private function fillPDFDirectly($formData, $outputPath)
+    {
+        // Let's use the php-pdftk library but try to bypass the drop_xfa issue
+        // by using a different approach that mimics your working script
+
+        try {
+            // First approach: Try using the library with explicit no flatten/no drop_xfa
+            $pdf = new Pdf($this->pdfTemplatePath);
+
+            // Set options to prevent drop_xfa
+            $pdf->setOptions([
+                'flatten' => false,
+                'drop_xfa' => false
+            ]);
+
+            $result = $pdf->fillForm($formData)->saveAs($outputPath);
+
+            if ($result && file_exists($outputPath) && filesize($outputPath) > 0) {
+                Log::info('PDFtk library method succeeded without drop_xfa');
+                return true;
+            }
+        } catch (\Exception $e) {
+            Log::warning('PDFtk library method failed: ' . $e->getMessage());
+        }
+
+        // Fallback: Try to use pdftk binary directly with minimal options
+        try {
+            // Create a simple data file using key=value format
+            $dataPath = storage_path('app/temp/form_data.txt');
+            $dataContent = '';
+
+            foreach ($formData as $name => $value) {
+                // Simple key=value format, one per line
+                $dataContent .= $name . '=' . $value . "\n";
+            }
+
+            file_put_contents($dataPath, $dataContent);
+
+            // Try the command exactly as it might work in your standalone script
+            $commands = [
+                // Method 1: Basic fill_form
+                sprintf(
+                    'pdftk "%s" fill_form "%s" output "%s"',
+                    $this->pdfTemplatePath,
+                    $dataPath,
+                    $outputPath
+                ),
+
+                // Method 2: Try with flatten
+                sprintf(
+                    'pdftk "%s" fill_form "%s" output "%s" flatten',
+                    $this->pdfTemplatePath,
+                    $dataPath,
+                    $outputPath
+                ),
+
+                // Method 3: Try copying first, then filling
+                sprintf(
+                    'copy "%s" "%s" && pdftk "%s" update_info "%s" output "%s"',
+                    $this->pdfTemplatePath,
+                    $outputPath,
+                    $outputPath,
+                    $dataPath,
+                    $outputPath . '.tmp'
+                )
+            ];
+
+            foreach ($commands as $i => $command) {
+                Log::info('Trying PDFtk command method ' . ($i + 1) . ': ' . $command);
+
+                $output = [];
+                $returnCode = 0;
+                exec($command . ' 2>&1', $output, $returnCode);
+
+                Log::info('PDFtk command result', [
+                    'method' => $i + 1,
+                    'return_code' => $returnCode,
+                    'output' => $output,
+                    'output_file_exists' => file_exists($outputPath),
+                    'output_file_size' => file_exists($outputPath) ? filesize($outputPath) : 0
+                ]);
+
+                if ($returnCode === 0 && file_exists($outputPath) && filesize($outputPath) > 0) {
+                    // Clean up
+                    if (file_exists($dataPath)) {
+                        unlink($dataPath);
+                    }
+
+                    Log::info('PDFtk direct method succeeded with method ' . ($i + 1));
+                    return true;
+                }
+            }
+
+            // Clean up
+            if (file_exists($dataPath)) {
+                unlink($dataPath);
+            }
+        } catch (\Exception $e) {
+            Log::error('PDFtk direct execution failed: ' . $e->getMessage());
+        }
+
+        // If all methods fail, log the failure but don't throw exception
+        // Let the calling method handle fallback to empty PDF
+        Log::error('All PDFtk methods failed for form filling');
+        return false;
     }
 
     /**

@@ -168,6 +168,12 @@
                 </svg>
                 Download PDF
             </a>
+            <a href="#" id="contextMenuDownloadFilledPDF" onclick="downloadIndividualFilledPDF(event)" class="flex items-center px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-150">
+                <svg class="mr-3 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Download Filled PDF
+            </a>
         </div>
     </div>
 
@@ -539,6 +545,44 @@
             formatInput.name = 'export';
             formatInput.value = 'pdf';
             form.appendChild(formatInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
+
+        // Download individual Filled PDF
+        function downloadIndividualFilledPDF(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            if (!currentEmployeeNumber || !currentYear) {
+                console.error('Missing employee number or year');
+                return;
+            }
+            
+            // Hide context menu
+            contextMenu.classList.add('hidden');
+            
+            // Create and submit form
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/government-forms/bir-2316/' + currentEmployeeNumber + '/generate-filled';
+            form.style.display = 'none';
+            
+            // Add CSRF token
+            const csrfToken = document.createElement('input');
+            csrfToken.type = 'hidden';
+            csrfToken.name = '_token';
+            csrfToken.value = '{{ csrf_token() }}';
+            form.appendChild(csrfToken);
+            
+            // Add year
+            const yearInput = document.createElement('input');
+            yearInput.type = 'hidden';
+            yearInput.name = 'year';
+            yearInput.value = currentYear;
+            form.appendChild(yearInput);
             
             document.body.appendChild(form);
             form.submit();

@@ -5,20 +5,38 @@
                 {{ __('BIR Form 2316') }} - {{ $employee->first_name }} {{ $employee->last_name }}
             </h2>
             <div class="flex space-x-2">
-                <a href="{{ route('government-forms.bir-2316.individual', ['employee' => $employee->id, 'year' => $year, 'action' => 'download_excel']) }}" 
-                   class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    Download Excel
-                </a>
-                <a href="{{ route('government-forms.bir-2316.individual', ['employee' => $employee->id, 'year' => $year, 'action' => 'download_pdf']) }}" 
-                   class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    Download PDF
-                </a>
+                <form method="POST" action="{{ route('bir-2316.individual.generate', $employee->id) }}" class="inline">
+                    @csrf
+                    <input type="hidden" name="year" value="{{ $year }}">
+                    <input type="hidden" name="export" value="excel">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Download Excel
+                    </button>
+                </form>
+                <form method="POST" action="{{ route('bir-2316.individual.generate', $employee->id) }}" class="inline">
+                    @csrf
+                    <input type="hidden" name="year" value="{{ $year }}">
+                    <input type="hidden" name="export" value="pdf">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Download PDF
+                    </button>
+                </form>
+                <form method="POST" action="{{ route('bir-2316.individual.generate.filled', $employee->id) }}" class="inline">
+                    @csrf
+                    <input type="hidden" name="year" value="{{ $year }}">
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Download Filled PDF
+                    </button>
+                </form>
                 <a href="{{ route('government-forms.bir-2316.employees', ['year' => $year]) }}" 
                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded flex items-center">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

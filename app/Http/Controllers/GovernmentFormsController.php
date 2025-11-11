@@ -366,4 +366,36 @@ class GovernmentFormsController extends Controller
             return $this->bir2316TemplateService->downloadIndividualPDF($employee, $year);
         }
     }
+
+    /**
+     * Generate individual BIR 2316 filled PDF download 
+     */
+    public function bir2316IndividualGenerateFilled(Request $request, Employee $employee)
+    {
+        // Check if user has proper authorization for government forms
+        if (!$request->user()->hasAnyRole(['System Administrator', 'HR Head', 'HR Staff'])) {
+            abort(403, 'Unauthorized access. Only System Administrator, HR Head, and HR Staff can access government forms.');
+        }
+
+        $year = $request->get('year', now()->year);
+
+        return $this->bir2316TemplateService->downloadIndividualFilledPDF($employee, $year);
+    }
+
+    /**
+     * Debug BIR 2316 PDF form filling
+     */
+    public function bir2316DebugPDF(Request $request, Employee $employee)
+    {
+        // Check if user has proper authorization for government forms
+        if (!$request->user()->hasAnyRole(['System Administrator', 'HR Head', 'HR Staff'])) {
+            abort(403, 'Unauthorized access. Only System Administrator, HR Head, and HR Staff can access government forms.');
+        }
+
+        $year = $request->get('year', now()->year);
+
+        $debugResult = $this->bir2316TemplateService->testPDFFormFilling($employee, $year);
+
+        return response()->json($debugResult, 200, [], JSON_PRETTY_PRINT);
+    }
 }
