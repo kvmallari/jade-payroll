@@ -15,7 +15,68 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-       
+            
+            <!-- Success/Error Messages -->
+            @if (session('success'))
+                <div class="bg-green-50 border border-green-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-green-800">{{ session('success') }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if (session('warning'))
+                <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-yellow-800">{{ session('warning') }}</p>
+                            @if (session('import_errors'))
+                                <div class="mt-2">
+                                    <ul class="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                                        @foreach (array_slice(session('import_errors'), 0, 10) as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                        @if (count(session('import_errors')) > 10)
+                                            <li><em>... and {{ count(session('import_errors')) - 10 }} more errors</em></li>
+                                        @endif
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($errors->any())
+                <div class="bg-red-50 border border-red-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             <!-- Template Download Card -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
@@ -46,7 +107,7 @@
                 <div class="px-4 py-5 sm:p-6">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Upload DTR File</h3>
                     
-                    <form action="{{ route('dtr.import') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                    <form action="{{ route('dtr.import.process') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
                         @csrf
                         
                         <!-- File Upload -->
@@ -113,38 +174,37 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Number</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Name</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Break In</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Break Out</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <tr>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">EMP-2025-0001</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">juan.doe@company.com</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Juan Dela Cruz</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-08-09</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">08:00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">17:00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">12:00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">13:00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Regular day</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-11-10</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">8:00 AM</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">5:00 PM</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">12:00 PM</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">1:00 PM</td>
                                 </tr>
                                 <tr class="bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">EMP-2025-0002</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">maria.santos@company.com</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Maria Santos</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-08-09</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-11-10</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">09:00</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">18:30</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">12:30</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">13:30</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">EMP-2025-0003</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-11-10</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">7:30AM</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">4:30PM</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Overtime</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -152,16 +212,16 @@
                     <div class="mt-4 text-sm text-gray-600">
                         <p><strong>Notes:</strong></p>
                         <ul class="list-disc list-inside space-y-1 mt-2">
-                            <li>Either Employee Number or Email is required to identify the employee</li>
-                            <li>Employee Name column is for reference only and not used in import</li>
-                            <li>Break times are optional - if omitted, 1 hour break will be automatically deducted</li>
-                            <li>All imported time logs will be automatically approved</li>
+                            <li><strong>Employee Number is required</strong> to identify the employee (must match existing active employees)</li>
+                            <li><strong>Time formats supported:</strong> Both 12-hour (8:00 AM, 5:00 PM) and 24-hour (09:00, 17:00) formats</li>
+                            <li><strong>Date format:</strong> YYYY-MM-DD (e.g., 2024-11-10) or other standard date formats</li>
+                            <li><strong>Break times are optional</strong> - leave empty if no specific breaks were taken</li>
+                            <li><strong>Flexible time input:</strong> Supports "8AM", "8:00AM", "08:00", "8:00 AM" formats</li>
+                            <li>The system will automatically calculate hours, overtime, and handle holidays/rest days</li>
                         </ul>
                     </div>
                 </div>
-            </div>
-
-        </div>
+            }        </div>
     </div>
 
     <!-- File Upload JavaScript -->

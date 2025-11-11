@@ -232,7 +232,7 @@
                              style="display: none;">
                             <div class="py-2">
                                 @can('import time logs')
-                                <a href="{{ route('dtr.import-form') }}" 
+                                <a href="{{ route('dtr.import') }}" 
                                    class="flex items-center px-6 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-800 transition-colors duration-150">
                                     <svg class="mr-4 h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>

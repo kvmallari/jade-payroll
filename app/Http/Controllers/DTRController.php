@@ -688,17 +688,18 @@ class DTRController extends Controller
 
             if ($errorCount > 0) {
                 $errors = $import->getErrors();
-                return redirect()->route('dtr.index')
+                return redirect()->route('dtr.import')
                     ->with('warning', $message)
                     ->with('import_errors', $errors);
             }
 
-            return redirect()->route('dtr.index')
+            return redirect()->route('dtr.import')
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('DTR Import Error: ' . $e->getMessage());
-            return back()->withErrors(['error' => 'Failed to import DTR: ' . $e->getMessage()])
+            return redirect()->route('dtr.import')
+                ->withErrors(['error' => 'Failed to import DTR: ' . $e->getMessage()])
                 ->withInput();
         }
     }
@@ -712,7 +713,7 @@ class DTRController extends Controller
 
         $fileName = 'dtr_import_template_' . date('Y-m-d') . '.csv';
 
-        // Create CSV template with just headers (no sample data)
+        // Create CSV template with headers and sample data
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
@@ -722,7 +723,7 @@ class DTRController extends Controller
         return response()->streamDownload(function () {
             $output = fopen('php://output', 'w');
 
-            // CSV Headers only - no sample data
+            // CSV Headers
             fputcsv($output, [
                 'Employee Number',
                 'Date',
@@ -732,8 +733,36 @@ class DTRController extends Controller
                 'Break Out'
             ]);
 
-            // Add a few empty rows for users to fill
-            for ($i = 0; $i < 10; $i++) {
+            // Sample data showing both 12-hour (AM/PM) and 24-hour time formats
+            fputcsv($output, [
+                'EMP-2025-0001',
+                '2024-11-10',
+                '8:00 AM',
+                '5:00 PM',
+                '12:00 PM',
+                '1:00 PM'
+            ]);
+
+            fputcsv($output, [
+                'EMP-2025-0002',
+                '2024-11-10',
+                '09:00',
+                '18:30',
+                '12:30',
+                '13:30'
+            ]);
+
+            fputcsv($output, [
+                'EMP-2025-0003',
+                '2024-11-10',
+                '7:30AM',
+                '4:30PM',
+                '',
+                ''
+            ]);
+
+            // Add empty rows for users to fill
+            for ($i = 0; $i < 7; $i++) {
                 fputcsv($output, ['', '', '', '', '', '']);
             }
 

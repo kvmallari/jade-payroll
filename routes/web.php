@@ -319,11 +319,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/store', [DTRController::class, 'store'])->name('store');
 
             // DTR Import routes
-            Route::get('/import/form', [DTRController::class, 'importForm'])
-                ->name('import-form')
+            Route::get('/import', [DTRController::class, 'importForm'])
+                ->name('import')
                 ->middleware('can:import time logs');
             Route::post('/import', [DTRController::class, 'import'])
-                ->name('import')
+                ->name('import.process')
                 ->middleware('can:import time logs');
             Route::get('/export/template', [DTRController::class, 'exportTemplate'])
                 ->name('export-template')
