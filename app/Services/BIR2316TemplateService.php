@@ -433,13 +433,21 @@ class BIR2316TemplateService
                 mkdir(storage_path('app/temp'), 0755, true);
             }
 
+            // Calculate dynamic MWE for test data
+            $birSettings = BIR2316Setting::where('tax_year', $year)->first();
+            $employeeDailyRate = $this->calculateEmployeeDailyRate($employee);
+            $statutoryMinWage = $birSettings ? $birSettings->statutory_minimum_wage_per_day : 0;
+
+            $mweValue = ($statutoryMinWage > 0 && $employeeDailyRate <= $statutoryMinWage) ? 'Yes' : 'No';
+
             // Try simple fill first
             $simpleFillData = [
                 'year' => (string)$year,
                 'employee_name' => 'TEST EMPLOYEE NAME',
                 '19' => '100000.00',
                 '21' => '90000.00',
-                '28' => '10000.00'
+                '28' => '10000.00',
+                'mwe' => $mweValue
             ];
 
             $pdf = new Pdf($this->pdfTemplatePath);
@@ -550,8 +558,6 @@ class BIR2316TemplateService
 
             // Main employer checkbox - use 'Yes' for checkbox fields
             'main_employer' => 'Yes',
-            'mwe' => 'Yes',
-
 
             // Periods (using string format)
             'period_from' => (string)$year,
@@ -581,25 +587,18 @@ class BIR2316TemplateService
                 : now()->format('mdY'),
         ];
 
-        // Only add detailed compensation fields if they have actual values (> 0)
-        if (($data['overtime_pay'] ?? 0) > 0) {
-            $formData['30'] = sprintf('%.2f', $data['overtime_pay']);
-        }
-        if (($data['night_differential'] ?? 0) > 0) {
-            $formData['31'] = sprintf('%.2f', $data['night_differential']);
-        }
-        if (($data['holiday_pay'] ?? 0) > 0) {
-            $formData['32'] = sprintf('%.2f', $data['holiday_pay']);
-        }
-        if (($data['allowances'] ?? 0) > 0) {
-            $formData['33'] = sprintf('%.2f', $data['allowances']);
-        }
-        if (($data['bonuses'] ?? 0) > 0) {
-            $formData['34'] = sprintf('%.2f', $data['bonuses']);
-        }
-        if (($data['incentives'] ?? 0) > 0) {
-            $formData['35'] = sprintf('%.2f', $data['incentives']);
-        }
+        // Calculate additional fields from payroll snapshots for the same tax year
+        $additionalData = $this->calculateAdditionalFieldsFromPayrollSnapshots($employee, $year);
+
+        // Add compensation fields with proper rounding (no decimals, round .50+ up, .49- down)
+        // Always populate these fields for automatic calculations (even if 0)
+        $formData['29'] = (string)round($additionalData['basic_salary']); // Basic Salary
+        $formData['30'] = (string)round($additionalData['holiday_pay']); // Holiday Pay
+        $formData['31'] = (string)round($additionalData['overtime_pay']); // Overtime Pay
+        $formData['32'] = (string)round($additionalData['night_differential']); // Night Shift Differential
+        $formData['34'] = (string)round($additionalData['bonuses_total']); // 13th Month Pay and Other Benefits
+        $formData['35'] = (string)round($additionalData['allowances_total']); // De Minimis Benefits
+        $formData['36'] = (string)round($additionalData['total_deductions']); // SSS, GSIS, PHIC & PAG-IBIG Contributions
 
         // // Add mandatory contributions and other required fields
         // $formData['36'] = sprintf('%.2f', $data['total_contributions']); // SSS, GSIS, PHIC & PAG-IBIG Contributions
@@ -652,6 +651,20 @@ class BIR2316TemplateService
             }
         }
 
+        // Calculate MWE (Minimum Wage Earner) status
+        $employeeDailyRate = $this->calculateEmployeeDailyRate($employee);
+        $statutoryMinWage = $birSettings ? $birSettings->statutory_minimum_wage_per_day : 0;
+
+        // Set MWE field based on comparison
+        if ($statutoryMinWage > 0 && $employeeDailyRate <= $statutoryMinWage) {
+            $formData['mwe'] = 'Yes';
+        } else {
+            $formData['mwe'] = 'No';
+        }
+
+        // Automatic field calculations
+        $this->calculateAutomaticFields($formData);
+
         return $formData;
     }
 
@@ -700,6 +713,177 @@ class BIR2316TemplateService
         }
 
         return trim($signatureName);
+    }
+
+    /**
+     * Calculate employee's daily rate based on fixed_rate and rate_type
+     */
+    private function calculateEmployeeDailyRate(Employee $employee)
+    {
+        $fixedRate = $employee->fixed_rate ?? 0;
+        $rateType = $employee->rate_type ?? 'daily';
+
+        switch (strtolower($rateType)) {
+            case 'daily':
+                return $fixedRate;
+
+            case 'weekly':
+                // Assuming 6 working days per week
+                return $fixedRate / 6;
+
+            case 'monthly':
+                // Assuming 22 working days per month (standard in Philippines)
+                return $fixedRate / 22;
+
+            case 'semi-monthly':
+                // Assuming 11 working days per semi-month
+                return $fixedRate / 11;
+
+            case 'hourly':
+                // Assuming 8 hours per day
+                return $fixedRate * 8;
+
+            default:
+                // Default to treating as daily rate
+                return $fixedRate;
+        }
+    }
+
+    /**
+     * Calculate additional fields from payroll snapshots for a specific employee and tax year
+     */
+    private function calculateAdditionalFieldsFromPayrollSnapshots(Employee $employee, $year)
+    {
+        $startDate = Carbon::create($year, 1, 1)->startOfYear();
+        $endDate = $startDate->copy()->endOfYear();
+
+        // Get all payroll snapshots for the employee for the specified tax year
+        $payrollSnapshots = \App\Models\PayrollSnapshot::where('employee_id', $employee->id)
+            ->whereHas('payroll', function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('period_start', [$startDate, $endDate]);
+            })
+            ->get();
+
+        $totals = [
+            'basic_salary' => 0,
+            'holiday_pay' => 0,
+            'overtime_pay' => 0,
+            'night_differential' => 0,
+            'allowances_total' => 0,
+            'bonuses_total' => 0,
+            'total_deductions' => 0,
+        ];
+
+        foreach ($payrollSnapshots as $snapshot) {
+            // Field 29: Basic Salary - use 'regular_pay' column
+            $totals['basic_salary'] += $snapshot->regular_pay ?? 0;
+
+            // Field 30: Holiday Pay - use 'holiday_pay' column  
+            $totals['holiday_pay'] += $snapshot->holiday_pay ?? 0;
+
+            // Field 31: Overtime Pay - calculate from overtime_breakdown JSON (OT only, exclude ND)
+            // Field 32: Night Differential - calculate from overtime_breakdown JSON (only with ND)
+            if ($snapshot->overtime_breakdown) {
+                $overtimeBreakdown = is_string($snapshot->overtime_breakdown)
+                    ? json_decode($snapshot->overtime_breakdown, true)
+                    : $snapshot->overtime_breakdown;
+
+                if (is_array($overtimeBreakdown)) {
+                    foreach ($overtimeBreakdown as $key => $item) {
+                        if (isset($item['amount'])) {
+                            $amount = $item['amount'] ?? 0;
+
+                            // Field 32: Sum only entries with 'ND' in the key name
+                            if (strpos($key, 'ND') !== false) {
+                                $totals['night_differential'] += $amount;
+                            }
+                            // Field 31: Sum only entries with 'OT' in the key name but exclude those with 'ND'
+                            elseif (strpos($key, 'OT') !== false && strpos($key, 'ND') === false) {
+                                $totals['overtime_pay'] += $amount;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Field 34: Bonuses - use 'bonuses_total' column
+            $totals['bonuses_total'] += $snapshot->bonuses_total ?? 0;
+
+            // Field 35: Allowances - use 'allowances_total' column
+            $totals['allowances_total'] += $snapshot->allowances_total ?? 0;
+
+            // Field 36: Total Deductions - sum all amounts from deductions_breakdown JSON
+            if ($snapshot->deductions_breakdown) {
+                $deductionsBreakdown = is_string($snapshot->deductions_breakdown)
+                    ? json_decode($snapshot->deductions_breakdown, true)
+                    : $snapshot->deductions_breakdown;
+
+                if (is_array($deductionsBreakdown)) {
+                    foreach ($deductionsBreakdown as $item) {
+                        $totals['total_deductions'] += $item['amount'] ?? 0;
+                    }
+                }
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Calculate automatic fields based on other field values
+     */
+    private function calculateAutomaticFields(&$formData)
+    {
+        // Helper function to get numeric value from form field
+        $getValue = function ($field) use ($formData) {
+            return isset($formData[$field]) ? (float)$formData[$field] : 0;
+        };
+
+        // Check if MWE (Minimum Wage Earner) is checked
+        $isMWE = isset($formData['mwe']) && $formData['mwe'] === 'Yes';
+
+        if ($isMWE) {
+            // If MWE is TRUE/CHECKED: All fields 39-52 must be BLANK
+            // Don't set any fields 39-52 (keep them completely blank)
+            $formData['52'] = '0'; // Field 52 is blank/zero
+        } else {
+            // If MWE is FALSE/UNCHECKED: Fields 39, 48, 50, 52 must have values
+            $formData['39'] = $formData['29']; // Same as value of field 29 (Basic Salary)
+            $formData['48'] = $formData['34']; // Same as value of field 34 (13th Month Pay)
+            $formData['50'] = $formData['31']; // Same as value of field 31 (Overtime Pay)
+
+            // Calculate field 52 from the three non-MWE fields
+            $field52 = (float)$formData['39'] + (float)$formData['48'] + (float)$formData['50'];
+            $formData['52'] = (string)round($field52);
+        }
+
+        // Field 38: Sum of fields 29, 30, 31, 32, 33, 34, 35, 36, 37 (always calculate)
+        $field38 = $getValue('29') + $getValue('30') + $getValue('31') + $getValue('32') +
+            $getValue('33') + $getValue('34') + $getValue('35') + $getValue('36') + $getValue('37');
+        $formData['38'] = (string)round($field38);
+
+        // Now calculate all dependent fields using the updated formData values
+        // Field 19: Sum of field 38 and 52 (always calculate)
+        $field19 = (float)$formData['38'] + (float)$formData['52'];
+        $formData['19'] = (string)round($field19);
+
+        // Field 20: Value of field 38 (always calculate)
+        $formData['20'] = $formData['38']; // Direct copy
+
+        // Field 21: Value of field 52 (always calculate)
+        $formData['21'] = $formData['52']; // Direct copy
+
+        // Field 23: Sum of field 21 and 22 (always calculate)
+        $field23 = (float)$formData['21'] + $getValue('22');
+        $formData['23'] = (string)round($field23);
+
+        // Field 26: Sum of field 25A and 25B (always calculate)
+        $field26 = $getValue('25A') + $getValue('25B');
+        $formData['26'] = (string)round($field26);
+
+        // Field 28: Sum of field 26 and 27 (always calculate)
+        $field28 = (float)$formData['26'] + $getValue('27');
+        $formData['28'] = (string)round($field28);
     }
 
     /**
