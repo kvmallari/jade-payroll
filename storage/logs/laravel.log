@@ -4859,3 +4859,99 @@
 [2025-11-12 12:54:18] local.INFO: Standalone PDFtk execution result {"return_code":0,"command_output":[],"output_file_created":true,"output_file_size":251719} 
 [2025-11-12 12:54:18] local.INFO: Standalone PDFtk method succeeded!  
 [2025-11-12 12:54:18] local.INFO: PDF filling succeeded for employee: PTC-2025-0001 {"form_data_fields":50,"output_size":251719} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:17] local.INFO: Draft Payroll Calculation for Employee 47 {"basic_salary":0,"regular_pay":0,"overtime_pay":0,"holiday_pay":0,"rest_day_pay":0,"allowances":2300.0,"allowances_details":{"load_allowance":{"name":"Communication Allowance","amount":150.0,"is_taxable":false},"rice_allowance":{"name":"RA","amount":2000.0,"is_taxable":true},"transportation_allowance":{"name":"TA","amount":150.0,"is_taxable":false}},"bonuses":3000.0,"bonuses_details":{"performance_bonus":{"name":"PB","amount":"3000.00","is_taxable":true}},"incentives":0,"incentives_details":[],"gross_pay":5300.0,"net_pay":5300.0,"hours_worked":21.0,"days_worked":1,"regular_hours":9.0,"overtime_hours":12.0,"holiday_hours":0,"rest_day_hours":0,"late_hours":0.0,"undertime_hours":0.0,"late_deductions":0,"undertime_deductions":0,"cash_advance_deductions":0,"cash_advance_details":[]} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:17] local.INFO: Processing basic type: Regular Workday {"has_fixed_amount":false,"fixed_amount":"N/A","total_amount":800.0,"will_add_fixed":false,"will_add_full":true} 
+[2025-11-20 20:24:17] local.INFO: Added full amount for Regular Workday: 800, total: 800  
+[2025-11-20 20:24:17] local.INFO: Processing holiday type: Special Holiday {"has_fixed_amount":true,"fixed_amount":711.11,"total_amount":711.11} 
+[2025-11-20 20:24:17] local.INFO: Added holiday fixed amount for Special Holiday: 711.11, total: 1511.11  
+[2025-11-20 20:24:17] local.INFO: 13th Month Final Calculation {"total_fixed_pay":1511.1100000000001,"expected_total":2780.0,"monthly_13th":125.92583333333334} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":1511.1100000000001,"breakdown_data_count":2,"will_use_current_only":true} 
+[2025-11-20 20:24:17] local.INFO: Using current period only for 13th month (snapshot mode) {"employee_id":47,"current_period_fixed_pay":1511.1100000000001,"monthly_amount":125.93,"reason":"Snapshot calculation - using current period only"} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:17] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:17] local.INFO: Processing basic type: Regular Workday {"has_fixed_amount":false,"fixed_amount":"N/A","total_amount":800.0,"will_add_fixed":false,"will_add_full":true} 
+[2025-11-20 20:24:17] local.INFO: Added full amount for Regular Workday: 800, total: 800  
+[2025-11-20 20:24:17] local.INFO: Processing holiday type: Special Holiday {"has_fixed_amount":true,"fixed_amount":711.11,"total_amount":711.11} 
+[2025-11-20 20:24:17] local.INFO: Added holiday fixed amount for Special Holiday: 711.11, total: 1511.11  
+[2025-11-20 20:24:17] local.INFO: 13th Month Final Calculation {"total_fixed_pay":1511.1100000000001,"expected_total":2780.0,"monthly_13th":125.92583333333334} 
+[2025-11-20 20:24:17] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":1511.1100000000001,"breakdown_data_count":2,"will_use_current_only":true} 
+[2025-11-20 20:24:17] local.INFO: Using current period only for 13th month (snapshot mode) {"employee_id":47,"current_period_fixed_pay":1511.1100000000001,"monthly_amount":125.93,"reason":"Snapshot calculation - using current period only"} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:18] local.INFO: Draft Payroll Calculation for Employee 47 {"basic_salary":0,"regular_pay":0,"overtime_pay":0,"holiday_pay":0,"rest_day_pay":0,"allowances":2300.0,"allowances_details":{"load_allowance":{"name":"Communication Allowance","amount":150.0,"is_taxable":false},"rice_allowance":{"name":"RA","amount":2000.0,"is_taxable":true},"transportation_allowance":{"name":"TA","amount":150.0,"is_taxable":false}},"bonuses":3000.0,"bonuses_details":{"performance_bonus":{"name":"PB","amount":"3000.00","is_taxable":true}},"incentives":0,"incentives_details":[],"gross_pay":5300.0,"net_pay":5300.0,"hours_worked":21.0,"days_worked":1,"regular_hours":9.0,"overtime_hours":12.0,"holiday_hours":0,"rest_day_hours":0,"late_hours":0.0,"undertime_hours":0.0,"late_deductions":0,"undertime_deductions":0,"cash_advance_deductions":0,"cash_advance_details":[]} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:18] local.INFO: Processing basic type: Regular Workday {"has_fixed_amount":false,"fixed_amount":"N/A","total_amount":800.0,"will_add_fixed":false,"will_add_full":true} 
+[2025-11-20 20:24:18] local.INFO: Added full amount for Regular Workday: 800, total: 800  
+[2025-11-20 20:24:18] local.INFO: Processing holiday type: Special Holiday {"has_fixed_amount":true,"fixed_amount":711.11,"total_amount":711.11} 
+[2025-11-20 20:24:18] local.INFO: Added holiday fixed amount for Special Holiday: 711.11, total: 1511.11  
+[2025-11-20 20:24:18] local.INFO: 13th Month Final Calculation {"total_fixed_pay":1511.1100000000001,"expected_total":2780.0,"monthly_13th":125.92583333333334} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":1511.1100000000001,"breakdown_data_count":2,"will_use_current_only":true} 
+[2025-11-20 20:24:18] local.INFO: Using current period only for 13th month (snapshot mode) {"employee_id":47,"current_period_fixed_pay":1511.1100000000001,"monthly_amount":125.93,"reason":"Snapshot calculation - using current period only"} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:18] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:18] local.INFO: Processing basic type: Regular Workday {"has_fixed_amount":false,"fixed_amount":"N/A","total_amount":800.0,"will_add_fixed":false,"will_add_full":true} 
+[2025-11-20 20:24:18] local.INFO: Added full amount for Regular Workday: 800, total: 800  
+[2025-11-20 20:24:18] local.INFO: Processing holiday type: Special Holiday {"has_fixed_amount":true,"fixed_amount":711.11,"total_amount":711.11} 
+[2025-11-20 20:24:18] local.INFO: Added holiday fixed amount for Special Holiday: 711.11, total: 1511.11  
+[2025-11-20 20:24:18] local.INFO: 13th Month Final Calculation {"total_fixed_pay":1511.1100000000001,"expected_total":2780.0,"monthly_13th":125.92583333333334} 
+[2025-11-20 20:24:18] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":true,"current_fixed_pay":1511.1100000000001,"breakdown_data_count":2,"will_use_current_only":true} 
+[2025-11-20 20:24:18] local.INFO: Using current period only for 13th month (snapshot mode) {"employee_id":47,"current_period_fixed_pay":1511.1100000000001,"monthly_amount":125.93,"reason":"Snapshot calculation - using current period only"} 
+[2025-11-20 20:24:42] local.INFO: Automation Create called with: {"schedule":"semi_monthly"}  
+[2025-11-20 20:24:42] local.INFO: Schedule Code: semi_monthly  
+[2025-11-20 20:24:42] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:24:42] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:42] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:42] local.INFO: 13th Month calculation logic check {"employee_id":46,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:24:42] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":46,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:42] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":46,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:24:42] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:24:42] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-20 20:24:42] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:26:10] local.INFO: 13th Month calculation logic check {"employee_id":47,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:26:10] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":47,"year":"2025","payroll_count":0} 
+[2025-11-20 20:26:10] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":47,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:26:10] local.INFO: 13th Month calculation logic check {"employee_id":46,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:26:10] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":46,"year":"2025","payroll_count":0} 
+[2025-11-20 20:26:10] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":46,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-20 20:26:10] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-20 20:26:10] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-20 20:26:10] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 

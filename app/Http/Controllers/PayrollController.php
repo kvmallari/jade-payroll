@@ -5161,33 +5161,130 @@ class PayrollController extends Controller
      */
     private function calculateSemiMonthlyPeriod($setting, $currentDate)
     {
-        $day = $currentDate->day;
-        $month = $currentDate->month;
-        $year = $currentDate->year;
+        // Check if the setting has cutoff_periods configured
+        if (isset($setting->cutoff_periods) && is_array($setting->cutoff_periods) && count($setting->cutoff_periods) >= 2) {
+            // Use the new flexible cutoff period calculation
+            $cutoffPeriods = $setting->cutoff_periods;
+            $currentDay = $currentDate->day;
 
-        if ($day <= 15) {
-            // First half of the month (1st to 15th)
-            $start = \Carbon\Carbon::create($year, $month, 1);
-            $end = \Carbon\Carbon::create($year, $month, 15);
-            $periodName = $start->format('M') . ' 1-15';
+            // Parse cutoff periods to get numeric days
+            $firstPeriodStart = $this->parseDayNumber($cutoffPeriods[0]['start_day']);
+            $firstPeriodEnd = $this->parseDayNumber($cutoffPeriods[0]['end_day']);
+            $secondPeriodStart = $this->parseDayNumber($cutoffPeriods[1]['start_day']);
+            $secondPeriodEnd = $this->parseDayNumber($cutoffPeriods[1]['end_day']);
+
+            $firstPeriodPayDay = $this->parseDayNumber($cutoffPeriods[0]['pay_date'] ?? $firstPeriodEnd);
+            $secondPeriodPayDay = $this->parseDayNumber($cutoffPeriods[1]['pay_date'] ?? $secondPeriodEnd);
+
+            // Check if we're in the first or second period
+            $inFirstPeriod = false;
+            if ($firstPeriodStart > $firstPeriodEnd) {
+                // First period crosses month boundary (e.g., 21st to 5th)
+                $inFirstPeriod = ($currentDay >= $firstPeriodStart || $currentDay <= $firstPeriodEnd);
+            } else {
+                // First period is within same month
+                $inFirstPeriod = ($currentDay >= $firstPeriodStart && $currentDay <= $firstPeriodEnd);
+            }
+
+            if ($inFirstPeriod) {
+                // We're in the first period
+                if ($firstPeriodStart > $firstPeriodEnd) {
+                    // Period crosses month boundary
+                    if ($currentDay >= $firstPeriodStart) {
+                        // Currently in the start month (last month)
+                        $start = $currentDate->copy()->day($firstPeriodStart);
+                        $end = $currentDate->copy()->addMonth()->day($firstPeriodEnd);
+                        $periodName = $start->format('M d') . ' - ' . $end->format('M d');
+                    } else {
+                        // Currently in the end month (current month)
+                        $start = $currentDate->copy()->subMonth()->day($firstPeriodStart);
+                        $end = $currentDate->copy()->day($firstPeriodEnd);
+                        $periodName = $start->format('M d') . ' - ' . $end->format('M d');
+                    }
+                } else {
+                    // Period is within same month
+                    $start = $currentDate->copy()->day($firstPeriodStart);
+                    if ($firstPeriodEnd == 31) {
+                        $end = $currentDate->copy()->endOfMonth();
+                        $periodName = $start->format('M') . ' ' . $firstPeriodStart . '-EOD';
+                    } else {
+                        $end = $currentDate->copy()->day($firstPeriodEnd);
+                        $periodName = $start->format('M') . ' ' . $firstPeriodStart . '-' . $firstPeriodEnd;
+                    }
+                }
+                $payDay = $firstPeriodPayDay;
+            } else {
+                // We're in the second period
+                if ($secondPeriodStart > $secondPeriodEnd) {
+                    // Period crosses month boundary
+                    if ($currentDay >= $secondPeriodStart) {
+                        // Currently in the start month (last month)
+                        $start = $currentDate->copy()->day($secondPeriodStart);
+                        $end = $currentDate->copy()->addMonth()->day($secondPeriodEnd);
+                        $periodName = $start->format('M d') . ' - ' . $end->format('M d');
+                    } else {
+                        // Currently in the end month (current month)
+                        $start = $currentDate->copy()->subMonth()->day($secondPeriodStart);
+                        $end = $currentDate->copy()->day($secondPeriodEnd);
+                        $periodName = $start->format('M d') . ' - ' . $end->format('M d');
+                    }
+                } else {
+                    // Period is within same month
+                    $start = $currentDate->copy()->day($secondPeriodStart);
+                    if ($secondPeriodEnd == 31) {
+                        $end = $currentDate->copy()->endOfMonth();
+                        $periodName = $start->format('M') . ' ' . $secondPeriodStart . '-EOD';
+                    } else {
+                        $end = $currentDate->copy()->day($secondPeriodEnd);
+                        $periodName = $start->format('M') . ' ' . $secondPeriodStart . '-' . $secondPeriodEnd;
+                    }
+                }
+                $payDay = $secondPeriodPayDay;
+            }
+
+            // Set pay date - always in current month
+            if ($payDay == 31) {
+                $payDate = $currentDate->copy()->endOfMonth();
+            } else {
+                $payDate = $currentDate->copy()->day($payDay);
+            }
+
+            return [
+                'start' => $start->format('Y-m-d'),
+                'end' => $end->format('Y-m-d'),
+                'pay_date' => $payDate->format('Y-m-d'),
+                'name' => $periodName
+            ];
         } else {
-            // Second half of the month (16th to end)
-            $start = \Carbon\Carbon::create($year, $month, 16);
-            $end = \Carbon\Carbon::create($year, $month)->endOfMonth();
-            $periodName = $start->format('M') . ' 16-' . $end->day;
-        }
+            // Fallback to traditional 1-15, 16-31 calculation
+            $day = $currentDate->day;
+            $month = $currentDate->month;
+            $year = $currentDate->year;
 
-        $payDate = $end->copy();
-        if ($setting->payday_offset_days) {
-            $payDate = $end->copy()->addDays($setting->payday_offset_days);
-        }
+            if ($day <= 15) {
+                // First half of the month (1st to 15th)
+                $start = \Carbon\Carbon::create($year, $month, 1);
+                $end = \Carbon\Carbon::create($year, $month, 15);
+                $periodName = $start->format('M') . ' 1-15';
+            } else {
+                // Second half of the month (16th to end)
+                $start = \Carbon\Carbon::create($year, $month, 16);
+                $end = \Carbon\Carbon::create($year, $month)->endOfMonth();
+                $periodName = $start->format('M') . ' 16-' . $end->day;
+            }
 
-        return [
-            'start' => $start->format('Y-m-d'),
-            'end' => $end->format('Y-m-d'),
-            'pay_date' => $payDate->format('Y-m-d'),
-            'name' => $periodName
-        ];
+            $payDate = $end->copy();
+            if ($setting->payday_offset_days) {
+                $payDate = $end->copy()->addDays($setting->payday_offset_days);
+            }
+
+            return [
+                'start' => $start->format('Y-m-d'),
+                'end' => $end->format('Y-m-d'),
+                'pay_date' => $payDate->format('Y-m-d'),
+                'name' => $periodName
+            ];
+        }
     }
 
     /**
@@ -5411,31 +5508,72 @@ class PayrollController extends Controller
         $secondPeriodEnd = $this->parseDayNumber($cutoffPeriods[1]['end_day']);
 
         // Determine which period we're currently in
-        if ($currentDay >= $firstPeriodStart && $currentDay <= $firstPeriodEnd) {
-            // We're in the first period
-            $periodStart = $currentDate->copy()->startOfMonth()->day($firstPeriodStart);
-            $periodEnd = $currentDate->copy()->startOfMonth()->day($firstPeriodEnd);
-            $payDay = $this->parseDayNumber($cutoffPeriods[0]['pay_date'] ?? $firstPeriodEnd);
+        $firstPeriodPayDay = $this->parseDayNumber($cutoffPeriods[0]['pay_date'] ?? $firstPeriodEnd);
+        $secondPeriodPayDay = $this->parseDayNumber($cutoffPeriods[1]['pay_date'] ?? $secondPeriodEnd);
+
+        // Check if we're in the first or second period
+        $inFirstPeriod = false;
+        if ($firstPeriodStart > $firstPeriodEnd) {
+            // First period crosses month boundary (e.g., 21st to 5th)
+            $inFirstPeriod = ($currentDay >= $firstPeriodStart || $currentDay <= $firstPeriodEnd);
         } else {
-            // We're in the second period
-            $periodStart = $currentDate->copy()->startOfMonth()->day($secondPeriodStart);
-            if ($secondPeriodEnd == 31) {
-                $periodEnd = $currentDate->copy()->endOfMonth();
-            } else {
-                $periodEnd = $currentDate->copy()->startOfMonth()->day($secondPeriodEnd);
-            }
-            $payDay = $this->parseDayNumber($cutoffPeriods[1]['pay_date'] ?? $secondPeriodEnd);
+            // First period is within same month
+            $inFirstPeriod = ($currentDay >= $firstPeriodStart && $currentDay <= $firstPeriodEnd);
         }
 
-        // Set pay date
-        if ($payDay == 31) {
-            $payDate = $periodEnd->copy()->endOfMonth();
-        } else {
-            $payDate = $currentDate->copy()->startOfMonth()->day($payDay);
-            // If pay date is before period end, it might be in next month
-            if ($payDate->lt($periodEnd)) {
-                $payDate = $payDate->addMonth();
+        if ($inFirstPeriod) {
+            // We're in the first period
+            if ($firstPeriodStart > $firstPeriodEnd) {
+                // Period crosses month boundary
+                if ($currentDay >= $firstPeriodStart) {
+                    // Currently in the start month (last month)
+                    $periodStart = $currentDate->copy()->day($firstPeriodStart);
+                    $periodEnd = $currentDate->copy()->addMonth()->day($firstPeriodEnd);
+                } else {
+                    // Currently in the end month (current month)
+                    $periodStart = $currentDate->copy()->subMonth()->day($firstPeriodStart);
+                    $periodEnd = $currentDate->copy()->day($firstPeriodEnd);
+                }
+            } else {
+                // Period is within same month
+                $periodStart = $currentDate->copy()->day($firstPeriodStart);
+                if ($firstPeriodEnd == 31) {
+                    $periodEnd = $currentDate->copy()->endOfMonth();
+                } else {
+                    $periodEnd = $currentDate->copy()->day($firstPeriodEnd);
+                }
             }
+            $payDay = $firstPeriodPayDay;
+        } else {
+            // We're in the second period
+            if ($secondPeriodStart > $secondPeriodEnd) {
+                // Period crosses month boundary
+                if ($currentDay >= $secondPeriodStart) {
+                    // Currently in the start month (last month)
+                    $periodStart = $currentDate->copy()->day($secondPeriodStart);
+                    $periodEnd = $currentDate->copy()->addMonth()->day($secondPeriodEnd);
+                } else {
+                    // Currently in the end month (current month)
+                    $periodStart = $currentDate->copy()->subMonth()->day($secondPeriodStart);
+                    $periodEnd = $currentDate->copy()->day($secondPeriodEnd);
+                }
+            } else {
+                // Period is within same month
+                $periodStart = $currentDate->copy()->day($secondPeriodStart);
+                if ($secondPeriodEnd == 31) {
+                    $periodEnd = $currentDate->copy()->endOfMonth();
+                } else {
+                    $periodEnd = $currentDate->copy()->day($secondPeriodEnd);
+                }
+            }
+            $payDay = $secondPeriodPayDay;
+        }
+
+        // Set pay date - always in current month
+        if ($payDay == 31) {
+            $payDate = $currentDate->copy()->endOfMonth();
+        } else {
+            $payDate = $currentDate->copy()->day($payDay);
         }
 
         return [
@@ -5592,10 +5730,10 @@ class PayrollController extends Controller
             $cutoffPeriods = json_decode($cutoffPeriods, true);
         }
         if (empty($cutoffPeriods) || !isset($cutoffPeriods[0]) || !is_array($cutoffPeriods[0])) {
-            // Fallback to 1-7 and 8-31
+            // Fallback to 1-15 and 16-31
             $cutoffPeriods = [
-                ['start_day' => '1st', 'end_day' => '7th', 'pay_day' => '7th'],
-                ['start_day' => '8th', 'end_day' => '31st', 'pay_day' => '31st']
+                ['start_day' => 1, 'end_day' => 15, 'pay_date' => 20],
+                ['start_day' => 16, 'end_day' => 31, 'pay_date' => 5]
             ];
         }
 
@@ -5613,29 +5751,72 @@ class PayrollController extends Controller
         $secondPeriodEnd = $this->parseDayNumber($cutoffPeriods[1]['end_day']);
 
         // Determine which period we're in based on current date
-        // Note: periods can overlap (e.g., 1-7 and 7-31), so we use <= for first period check
-        // Use both 'pay_day' and 'pay_date' keys for compatibility
-        if ($currentDay >= $firstPeriodStart && $currentDay <= $firstPeriodEnd && $currentDay < $secondPeriodStart) {
-            // We're in the first period (e.g., 1-7)
-            $periodStart = $currentDate->copy()->startOfMonth()->day($firstPeriodStart);
-            $periodEnd = $currentDate->copy()->startOfMonth()->day($firstPeriodEnd);
-            $payDay = $this->parseDayNumber($cutoffPeriods[0]['pay_date'] ?? $cutoffPeriods[0]['pay_day'] ?? $firstPeriodEnd);
+        $firstPeriodPayDay = $this->parseDayNumber($cutoffPeriods[0]['pay_date'] ?? $cutoffPeriods[0]['pay_day'] ?? $firstPeriodEnd);
+        $secondPeriodPayDay = $this->parseDayNumber($cutoffPeriods[1]['pay_date'] ?? $cutoffPeriods[1]['pay_day'] ?? $secondPeriodEnd);
+
+        // Check if we're in the first or second period
+        $inFirstPeriod = false;
+        if ($firstPeriodStart > $firstPeriodEnd) {
+            // First period crosses month boundary (e.g., 21st to 5th)
+            $inFirstPeriod = ($currentDay >= $firstPeriodStart || $currentDay <= $firstPeriodEnd);
         } else {
-            // We're in the second period (e.g., 7-31)
-            $periodStart = $currentDate->copy()->startOfMonth()->day($secondPeriodStart);
-            if ($secondPeriodEnd == 31) {
-                $periodEnd = $currentDate->copy()->endOfMonth();
-            } else {
-                $periodEnd = $currentDate->copy()->startOfMonth()->day($secondPeriodEnd);
-            }
-            $payDay = $this->parseDayNumber($cutoffPeriods[1]['pay_date'] ?? $cutoffPeriods[1]['pay_day'] ?? $secondPeriodEnd);
+            // First period is within same month
+            $inFirstPeriod = ($currentDay >= $firstPeriodStart && $currentDay <= $firstPeriodEnd);
         }
 
-        // Set pay date
-        if ($payDay == 31) {
-            $payDate = $periodEnd->copy()->endOfMonth();
+        if ($inFirstPeriod) {
+            // We're in the first period
+            if ($firstPeriodStart > $firstPeriodEnd) {
+                // Period crosses month boundary
+                if ($currentDay >= $firstPeriodStart) {
+                    // Currently in the start month (last month)
+                    $periodStart = $currentDate->copy()->day($firstPeriodStart);
+                    $periodEnd = $currentDate->copy()->addMonth()->day($firstPeriodEnd);
+                } else {
+                    // Currently in the end month (current month)
+                    $periodStart = $currentDate->copy()->subMonth()->day($firstPeriodStart);
+                    $periodEnd = $currentDate->copy()->day($firstPeriodEnd);
+                }
+            } else {
+                // Period is within same month
+                $periodStart = $currentDate->copy()->day($firstPeriodStart);
+                if ($firstPeriodEnd == 31) {
+                    $periodEnd = $currentDate->copy()->endOfMonth();
+                } else {
+                    $periodEnd = $currentDate->copy()->day($firstPeriodEnd);
+                }
+            }
+            $payDay = $firstPeriodPayDay;
         } else {
-            $payDate = $currentDate->copy()->startOfMonth()->day($payDay);
+            // We're in the second period
+            if ($secondPeriodStart > $secondPeriodEnd) {
+                // Period crosses month boundary
+                if ($currentDay >= $secondPeriodStart) {
+                    // Currently in the start month (last month)
+                    $periodStart = $currentDate->copy()->day($secondPeriodStart);
+                    $periodEnd = $currentDate->copy()->addMonth()->day($secondPeriodEnd);
+                } else {
+                    // Currently in the end month (current month)
+                    $periodStart = $currentDate->copy()->subMonth()->day($secondPeriodStart);
+                    $periodEnd = $currentDate->copy()->day($secondPeriodEnd);
+                }
+            } else {
+                // Period is within same month
+                $periodStart = $currentDate->copy()->day($secondPeriodStart);
+                if ($secondPeriodEnd == 31) {
+                    $periodEnd = $currentDate->copy()->endOfMonth();
+                } else {
+                    $periodEnd = $currentDate->copy()->day($secondPeriodEnd);
+                }
+            }
+            $payDay = $secondPeriodPayDay;
+        }
+
+        // Set pay date - always in current month
+        if ($payDay == 31) {
+            $payDate = $currentDate->copy()->endOfMonth();
+        } else {
+            $payDate = $currentDate->copy()->day($payDay);
         }
 
         return [
@@ -10585,15 +10766,65 @@ class PayrollController extends Controller
                         $firstPeriod = $cutoffPeriods[0];
                         $secondPeriod = $cutoffPeriods[1];
 
-                        if ($currentDay <= (int)($firstPeriod['end_day'] ?? 15)) {
+                        $firstPeriodStart = $this->parseDayNumber($firstPeriod['start_day'] ?? 1);
+                        $firstPeriodEnd = $this->parseDayNumber($firstPeriod['end_day'] ?? 15);
+                        $secondPeriodStart = $this->parseDayNumber($secondPeriod['start_day'] ?? 16);
+                        $secondPeriodEnd = $this->parseDayNumber($secondPeriod['end_day'] ?? -1);
+
+                        // Check if we're in the first or second period
+                        $inFirstPeriod = false;
+                        if ($firstPeriodStart > $firstPeriodEnd) {
+                            // First period crosses month boundary (e.g., 21st to 5th)
+                            $inFirstPeriod = ($currentDay >= $firstPeriodStart || $currentDay <= $firstPeriodEnd);
+                        } else {
+                            // First period is within same month
+                            $inFirstPeriod = ($currentDay >= $firstPeriodStart && $currentDay <= $firstPeriodEnd);
+                        }
+
+                        if ($inFirstPeriod) {
                             // First period
-                            $semiStart = $start->copy()->setDay((int)($firstPeriod['start_day'] ?? 1));
-                            $semiEnd = $start->copy()->setDay(min((int)($firstPeriod['end_day'] ?? 15), $start->daysInMonth));
+                            if ($firstPeriodStart > $firstPeriodEnd) {
+                                // Period crosses month boundary
+                                if ($currentDay >= $firstPeriodStart) {
+                                    // Currently in the start month
+                                    $semiStart = $start->copy()->setDay($firstPeriodStart);
+                                    $semiEnd = $start->copy()->addMonth()->setDay($firstPeriodEnd);
+                                } else {
+                                    // Currently in the end month
+                                    $semiStart = $start->copy()->subMonth()->setDay($firstPeriodStart);
+                                    $semiEnd = $start->copy()->setDay($firstPeriodEnd);
+                                }
+                            } else {
+                                // Period is within same month
+                                $semiStart = $start->copy()->setDay($firstPeriodStart);
+                                if ($firstPeriodEnd == 31 || $firstPeriodEnd == -1) {
+                                    $semiEnd = $start->copy()->endOfMonth();
+                                } else {
+                                    $semiEnd = $start->copy()->setDay(min($firstPeriodEnd, $start->daysInMonth));
+                                }
+                            }
                         } else {
                             // Second period
-                            $semiStart = $start->copy()->setDay((int)($secondPeriod['start_day'] ?? 16));
-                            $endDay = (int)($secondPeriod['end_day'] ?? -1);
-                            $semiEnd = $endDay === -1 ? $start->copy()->endOfMonth() : $start->copy()->setDay(min($endDay, $start->daysInMonth));
+                            if ($secondPeriodStart > $secondPeriodEnd) {
+                                // Period crosses month boundary
+                                if ($currentDay >= $secondPeriodStart) {
+                                    // Currently in the start month
+                                    $semiStart = $start->copy()->setDay($secondPeriodStart);
+                                    $semiEnd = $start->copy()->addMonth()->setDay($secondPeriodEnd);
+                                } else {
+                                    // Currently in the end month
+                                    $semiStart = $start->copy()->subMonth()->setDay($secondPeriodStart);
+                                    $semiEnd = $start->copy()->setDay($secondPeriodEnd);
+                                }
+                            } else {
+                                // Period is within same month
+                                $semiStart = $start->copy()->setDay($secondPeriodStart);
+                                if ($secondPeriodEnd == 31 || $secondPeriodEnd == -1) {
+                                    $semiEnd = $start->copy()->endOfMonth();
+                                } else {
+                                    $semiEnd = $start->copy()->setDay(min($secondPeriodEnd, $start->daysInMonth));
+                                }
+                            }
                         }
 
                         return $this->calculateWorkingDaysForPeriod($employee, $semiStart, $semiEnd);

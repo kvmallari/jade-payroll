@@ -318,8 +318,24 @@ class CashAdvanceController extends Controller
         $startDay = (int) $cutoff['start_day'];
         $endDay = (int) $cutoff['end_day'];
 
-        $startDate = $targetMonth->copy()->day($startDay);
-        $endDate = $endDay == 31 ? $targetMonth->copy()->endOfMonth() : $targetMonth->copy()->day($endDay);
+        // Handle cross-month periods (when start_day > end_day)
+        if ($startDay > $endDay) {
+            // Period crosses month boundary
+            $startDate = $targetMonth->copy()->subMonth()->day($startDay);
+            if ($endDay == 31) {
+                $endDate = $targetMonth->copy()->endOfMonth();
+            } else {
+                $endDate = $targetMonth->copy()->day($endDay);
+            }
+        } else {
+            // Period is within same month
+            $startDate = $targetMonth->copy()->day($startDay);
+            if ($endDay == 31) {
+                $endDate = $targetMonth->copy()->endOfMonth();
+            } else {
+                $endDate = $targetMonth->copy()->day($endDay);
+            }
+        }
 
         return [
             'start' => $startDate,
