@@ -128,11 +128,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('payrolls/automation/schedules/{frequency}', [PayrollController::class, 'automationSchedules'])->name('payrolls.automation.schedules');
         Route::get('payrolls/automation/create', [PayrollController::class, 'automationCreate'])->name('payrolls.automation.create');
         Route::post('payrolls/automation/store', [PayrollController::class, 'automationStore'])->name('payrolls.automation.store');
-        Route::get('payrolls/automation/{schedule}', [PayrollController::class, 'automationList'])->name('payrolls.automation.list');
+        Route::get('payrolls/automation/{schedule}', [PayrollController::class, 'automationList'])->name('payrolls.automation.list')->where('schedule', '[A-Za-z0-9_-]+');
 
         // Unified Payroll Routes - for individual employee automation payrolls
         // Single route that handles both employee ID (drafts) and payroll ID (saved payrolls)
-        Route::get('payrolls/automation/{schedule}/{id}', [PayrollController::class, 'showUnifiedPayroll'])->name('payrolls.automation.show')->where('id', '[0-9]+');
+        Route::get('payrolls/automation/{schedule}/{id}', [PayrollController::class, 'showUnifiedPayroll'])->name('payrolls.automation.show')->where(['schedule' => '[A-Za-z0-9_-]+', 'id' => '[0-9]+']);
         Route::post('payrolls/automation/{schedule}/{id}/process', [PayrollController::class, 'processUnifiedPayroll'])->name('payrolls.automation.process');
         Route::post('payrolls/automation/{schedule}/{id}/approve', [PayrollController::class, 'approveUnifiedPayroll'])->name('payrolls.automation.approve')->middleware('can:approve payrolls');
         Route::post('payrolls/automation/{schedule}/{id}/back-to-draft', [PayrollController::class, 'backToUnifiedDraft'])->name('payrolls.automation.back-to-draft');

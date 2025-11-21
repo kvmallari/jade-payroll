@@ -1230,15 +1230,29 @@ class PayrollController extends Controller
     {
         $this->authorize('view payrolls');
 
-        // Handle both new PaySchedule IDs and legacy PayScheduleSetting codes
+        // Handle both new PaySchedule names and legacy PayScheduleSetting codes
         $selectedSchedule = null;
         $scheduleCode = null;
 
-        if (is_numeric($schedule)) {
-            // New system - PaySchedule model
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
+            ->first();
+
+        if ($paySchedule) {
+            // For new schedules, use the type as the code for payroll queries (maintains compatibility)
+            $scheduleCode = $paySchedule->type;
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->type,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id
+            ];
+        } else if (is_numeric($schedule)) {
+            // Fallback: try by ID (new system)
             $paySchedule = PaySchedule::active()->find($schedule);
             if ($paySchedule) {
-                // For new schedules, use the type as the code for payroll queries
+                // For new schedules, use the type as the code for payroll queries (maintains compatibility)
                 $scheduleCode = $paySchedule->type;
                 $selectedSchedule = (object) [
                     'code' => $paySchedule->type,
@@ -1264,10 +1278,9 @@ class PayrollController extends Controller
         }
 
         // Calculate current period to filter payrolls
-        if (isset($selectedSchedule->id) && is_numeric($schedule)) {
-            // New PaySchedule system - need to get the actual PaySchedule object
-            $payScheduleObj = PaySchedule::find($schedule);
-            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($payScheduleObj);
+        if (isset($selectedSchedule->id) && $paySchedule) {
+            // New PaySchedule system
+            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
         } else {
             // Legacy PayScheduleSetting system
             $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
@@ -8577,9 +8590,25 @@ class PayrollController extends Controller
     {
         $this->authorize('view payrolls');
 
-        $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-            ->where('code', $schedule)
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
             ->first();
+
+        $selectedSchedule = null;
+        if ($paySchedule) {
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->type,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id
+            ];
+        } else {
+            // Legacy system fallback
+            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+        }
 
         if (!$selectedSchedule) {
             return redirect()->route('payrolls.automation.index')
@@ -8589,7 +8618,7 @@ class PayrollController extends Controller
         // First, check if this ID is a payroll ID (for saved/historical payrolls)
         $payroll = Payroll::with(['payrollDetails.employee', 'creator', 'approver'])
             ->where('id', $id)
-            ->where('pay_schedule', $schedule)
+            ->where('pay_schedule', $selectedSchedule->code)
             ->first();
 
         if ($payroll) {
@@ -8612,13 +8641,20 @@ class PayrollController extends Controller
                 ->with('error', 'Employee or payroll not found.');
         }
 
-        $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        // Use the appropriate period calculation method based on system type
+        if (isset($selectedSchedule->id) && $paySchedule) {
+            // New PaySchedule system
+            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        } else {
+            // Legacy PayScheduleSetting system
+            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        }
 
         // Check if a saved payroll exists for this employee and current period
         $existingPayroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
             $query->where('employee_id', $employee->id);
         })
-            ->where('pay_schedule', $schedule)
+            ->where('pay_schedule', $selectedSchedule->code)
             ->where('period_start', $currentPeriod['start'])
             ->where('period_end', $currentPeriod['end'])
             ->where('payroll_type', 'automated')
@@ -8644,22 +8680,46 @@ class PayrollController extends Controller
         $this->authorize('create payrolls');
 
         $employee = Employee::with(['timeSchedule', 'daySchedule'])->findOrFail($id);
-        $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-            ->where('code', $schedule)
+
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
             ->first();
+
+        $selectedSchedule = null;
+        if ($paySchedule) {
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->name,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id
+            ];
+        } else {
+            // Legacy system fallback
+            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+        }
 
         if (!$selectedSchedule) {
             return redirect()->route('payrolls.automation.index')
                 ->with('error', 'Invalid pay schedule selected.');
         }
 
-        $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        // Use the appropriate period calculation method based on system type
+        if (isset($selectedSchedule->id) && $paySchedule) {
+            // New PaySchedule system
+            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        } else {
+            // Legacy PayScheduleSetting system
+            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        }
 
         // Check if payroll already exists
         $existingPayroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
             $query->where('employee_id', $employee->id);
         })
-            ->where('pay_schedule', $schedule)
+            ->where('pay_schedule', $selectedSchedule->code)
             ->where('period_start', $currentPeriod['start'])
             ->where('period_end', $currentPeriod['end'])
             ->where('payroll_type', 'automated')
@@ -8699,16 +8759,40 @@ class PayrollController extends Controller
         $this->authorize('edit payrolls');
 
         $employee = Employee::findOrFail($id);
-        $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-            ->where('code', $schedule)
+
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
             ->first();
+
+        $selectedSchedule = null;
+        if ($paySchedule) {
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->name,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id
+            ];
+        } else {
+            // Legacy system fallback
+            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+        }
 
         if (!$selectedSchedule) {
             return redirect()->route('payrolls.automation.index')
                 ->with('error', 'Invalid pay schedule selected.');
         }
 
-        $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        // Use the appropriate period calculation method based on system type
+        if (isset($selectedSchedule->id) && $paySchedule) {
+            // New PaySchedule system
+            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        } else {
+            // Legacy PayScheduleSetting system
+            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        }
 
         try {
             DB::beginTransaction();
@@ -8717,7 +8801,7 @@ class PayrollController extends Controller
             $payrolls = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
                 $query->where('employee_id', $employee->id);
             })
-                ->where('pay_schedule', $schedule)
+                ->where('pay_schedule', $selectedSchedule->code)
                 ->where('period_start', $currentPeriod['start'])
                 ->where('period_end', $currentPeriod['end'])
                 ->where('payroll_type', 'automated')
@@ -8756,22 +8840,46 @@ class PayrollController extends Controller
         $this->authorize('approve payrolls');
 
         $employee = Employee::findOrFail($id);
-        $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-            ->where('code', $schedule)
+
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
             ->first();
+
+        $selectedSchedule = null;
+        if ($paySchedule) {
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->name,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id
+            ];
+        } else {
+            // Legacy system fallback
+            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+        }
 
         if (!$selectedSchedule) {
             return redirect()->route('payrolls.automation.index')
                 ->with('error', 'Invalid pay schedule selected.');
         }
 
-        $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        // Use the appropriate period calculation method based on system type
+        if (isset($selectedSchedule->id) && $paySchedule) {
+            // New PaySchedule system
+            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        } else {
+            // Legacy PayScheduleSetting system
+            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        }
 
         // Find existing payroll
         $payroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
             $query->where('employee_id', $employee->id);
         })
-            ->where('pay_schedule', $schedule)
+            ->where('pay_schedule', $selectedSchedule->code)
             ->where('period_start', $currentPeriod['start'])
             ->where('period_end', $currentPeriod['end'])
             ->where('payroll_type', 'automated')

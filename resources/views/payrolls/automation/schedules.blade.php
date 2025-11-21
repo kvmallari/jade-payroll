@@ -41,7 +41,7 @@
                     <div class="flex justify-center">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
                         @forelse($schedules as $schedule)
-                            <a href="{{ route('payrolls.automation.create', ['schedule' => $schedule->id]) }}" 
+                            <a href="{{ route('payrolls.automation.list', ['schedule' => $schedule->name]) }}" 
                                class="block border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-lg hover:bg-blue-50 transition-all duration-200 cursor-pointer transform hover:scale-105 h-80 min-h-80 max-h-80 w-full">
                                 <div class="py-6 px-8 h-full flex flex-col">
                                     <div class="flex items-center justify-between mb-4">
@@ -113,13 +113,13 @@
                                     <div class="text-center mt-auto">
                                         <div class="text-sm text-blue-600 font-medium">
                                             <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.293l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"></path>
+                                                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" clip-rule="evenodd"></path>
                                             </svg>
-                                            Create Payroll Now
+                                            View Payrolls
                                         </div>
                                         <div class="text-xs text-gray-500 mt-1">
                                             @if(($schedule->active_employees_count ?? 0) > 0)
-                                                Click to create payroll for {{ $schedule->active_employees_count }} active employee{{ $schedule->active_employees_count > 1 ? 's' : '' }}
+                                                Click to view payrolls for {{ $schedule->active_employees_count }} active employee{{ $schedule->active_employees_count > 1 ? 's' : '' }}
                                             @else
                                                 Click to view payrolls (no active employees)
                                             @endif

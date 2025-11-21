@@ -8966,3 +8966,155 @@
 [2025-11-21 16:17:39] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
 [2025-11-21 16:17:39] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
 [2025-11-21 16:17:39] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:31:01] local.ERROR: Undefined property: stdClass::$cutoff_periods {"userId":1,"exception":"[object] (ErrorException(code: 0): Undefined property: stdClass::$cutoff_periods at C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php:5576)
+[stacktrace]
+#0 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Bootstrap\\HandleExceptions.php(256): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->handleError(2, 'Undefined prope...', 'C:\\\\xampp\\\\htdocs...', 5576)
+#1 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php(5576): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->Illuminate\\Foundation\\Bootstrap\\{closure}(2, 'Undefined prope...', 'C:\\\\xampp\\\\htdocs...', 5576)
+#2 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php(5517): App\\Http\\Controllers\\PayrollController->calculateCurrentWeeklyPayPeriod(Object(stdClass), Object(Carbon\\Carbon))
+#3 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php(1287): App\\Http\\Controllers\\PayrollController->calculateCurrentPayPeriod(Object(stdClass))
+#4 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\ControllerDispatcher.php(46): App\\Http\\Controllers\\PayrollController->automationList(Object(Illuminate\\Http\\Request), 'WEEK-1')
+#5 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(265): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\PayrollController), 'automationList')
+#6 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(211): Illuminate\\Routing\\Route->runController()
+#7 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(808): Illuminate\\Routing\\Route->run()
+#8 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(169): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#9 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Auth\\Middleware\\Authorize.php(59): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#10 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Auth\\Middleware\\Authorize->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'view payrolls')
+#11 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Auth\\Middleware\\EnsureEmailIsVerified.php(41): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#12 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Auth\\Middleware\\EnsureEmailIsVerified->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#13 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Middleware\\ValidateLicense.php(44): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#14 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): App\\Http\\Middleware\\ValidateLicense->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#15 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#16 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#17 C:\\xampp\\htdocs\\payroll-react\\vendor\\inertiajs\\inertia-laravel\\src\\Middleware.php(100): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#18 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Inertia\\Middleware->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#19 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Middleware\\HandleAppearance.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#20 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): App\\Http\\Middleware\\HandleAppearance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#21 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#22 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#23 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Auth\\Middleware\\Authenticate.php(63): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#24 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#25 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken.php(87): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#26 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#27 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\View\\Middleware\\ShareErrorsFromSession.php(48): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#28 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#29 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Session\\Middleware\\StartSession.php(120): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#30 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Session\\Middleware\\StartSession.php(63): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest(Object(Illuminate\\Http\\Request), Object(Illuminate\\Session\\Store), Object(Closure))
+#31 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Session\\Middleware\\StartSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#32 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse.php(36): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#33 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#34 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Cookie\\Middleware\\EncryptCookies.php(74): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#35 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#36 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(126): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#37 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(807): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#38 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#39 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(750): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#40 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#41 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#42 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(169): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#43 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#44 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#45 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(126): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#46 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#47 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#48 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1219): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#49 C:\\xampp\\htdocs\\payroll-react\\public\\index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#50 {main}
+"} 
+[2025-11-21 16:31:11] local.ERROR: Undefined property: stdClass::$cutoff_periods {"userId":1,"exception":"[object] (ErrorException(code: 0): Undefined property: stdClass::$cutoff_periods at C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php:5576)
+[stacktrace]
+#0 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Bootstrap\\HandleExceptions.php(256): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->handleError(2, 'Undefined prope...', 'C:\\\\xampp\\\\htdocs...', 5576)
+#1 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php(5576): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->Illuminate\\Foundation\\Bootstrap\\{closure}(2, 'Undefined prope...', 'C:\\\\xampp\\\\htdocs...', 5576)
+#2 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php(5517): App\\Http\\Controllers\\PayrollController->calculateCurrentWeeklyPayPeriod(Object(stdClass), Object(Carbon\\Carbon))
+#3 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Controllers\\PayrollController.php(1287): App\\Http\\Controllers\\PayrollController->calculateCurrentPayPeriod(Object(stdClass))
+#4 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\ControllerDispatcher.php(46): App\\Http\\Controllers\\PayrollController->automationList(Object(Illuminate\\Http\\Request), 'SEMI-2')
+#5 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(265): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\PayrollController), 'automationList')
+#6 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(211): Illuminate\\Routing\\Route->runController()
+#7 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(808): Illuminate\\Routing\\Route->run()
+#8 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(169): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
+#9 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Auth\\Middleware\\Authorize.php(59): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#10 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Auth\\Middleware\\Authorize->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'view payrolls')
+#11 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Auth\\Middleware\\EnsureEmailIsVerified.php(41): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#12 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Auth\\Middleware\\EnsureEmailIsVerified->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#13 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Middleware\\ValidateLicense.php(44): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#14 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): App\\Http\\Middleware\\ValidateLicense->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#15 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#16 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#17 C:\\xampp\\htdocs\\payroll-react\\vendor\\inertiajs\\inertia-laravel\\src\\Middleware.php(100): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#18 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Inertia\\Middleware->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#19 C:\\xampp\\htdocs\\payroll-react\\app\\Http\\Middleware\\HandleAppearance.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#20 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): App\\Http\\Middleware\\HandleAppearance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#21 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#22 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#23 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Auth\\Middleware\\Authenticate.php(63): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#24 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#25 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken.php(87): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#26 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#27 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\View\\Middleware\\ShareErrorsFromSession.php(48): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#28 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\View\\Middleware\\ShareErrorsFromSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#29 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Session\\Middleware\\StartSession.php(120): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#30 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Session\\Middleware\\StartSession.php(63): Illuminate\\Session\\Middleware\\StartSession->handleStatefulRequest(Object(Illuminate\\Http\\Request), Object(Illuminate\\Session\\Store), Object(Closure))
+#31 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Session\\Middleware\\StartSession->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#32 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse.php(36): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#33 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#34 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Cookie\\Middleware\\EncryptCookies.php(74): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#35 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Cookie\\Middleware\\EncryptCookies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#36 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(126): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#37 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(807): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#38 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(786): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
+#39 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(750): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
+#40 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(739): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
+#41 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
+#42 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(169): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
+#43 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#44 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(208): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
+#45 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(126): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
+#46 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
+#47 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
+#48 C:\\xampp\\htdocs\\payroll-react\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1219): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
+#49 C:\\xampp\\htdocs\\payroll-react\\public\\index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
+#50 {main}
+"} 
+[2025-11-21 16:37:01] local.INFO: 13th Month calculation logic check {"employee_id":40,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-21 16:37:01] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":40,"year":"2025","payroll_count":0} 
+[2025-11-21 16:37:01] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":40,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:37:08] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-21 16:37:08] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:37:08] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:29] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-21 16:45:29] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:29] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: Draft Payroll Calculation for Employee 42 {"basic_salary":0,"regular_pay":0,"overtime_pay":0,"holiday_pay":0,"rest_day_pay":0,"allowances":3800.0,"allowances_details":{"load_allowance":{"name":"Communication Allowance","amount":150.0,"is_taxable":false},"transportation_allowance_1":{"name":"Transportation Allowance","amount":"1500.00","is_taxable":false},"rice_allowance":{"name":"RA","amount":2000.0,"is_taxable":true},"transportation_allowance":{"name":"TA","amount":150.0,"is_taxable":false}},"bonuses":3000.0,"bonuses_details":{"performance_bonus":{"name":"PB","amount":"3000.00","is_taxable":true}},"incentives":0,"incentives_details":[],"gross_pay":6800.0,"net_pay":6800.0,"hours_worked":0,"days_worked":0,"regular_hours":0,"overtime_hours":0,"holiday_hours":0,"rest_day_hours":0,"late_hours":0,"undertime_hours":0,"late_deductions":0,"undertime_deductions":0,"cash_advance_deductions":0,"cash_advance_details":[]} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Final Calculation {"total_fixed_pay":0,"expected_total":2780.0,"monthly_13th":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":true,"current_fixed_pay":0,"breakdown_data_count":2,"will_use_current_only":false} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:30] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
+[2025-11-21 16:45:51] local.INFO: 13th Month calculation logic check {"employee_id":42,"has_breakdown_data":false,"current_fixed_pay":0,"breakdown_data_count":"not_array","will_use_current_only":false} 
+[2025-11-21 16:45:51] local.INFO: 13th Month Pay - Processing existing payroll details (draft mode) {"employee_id":42,"year":"2025","payroll_count":0} 
+[2025-11-21 16:45:51] local.INFO: 13th Month Pay final calculation (draft mode) {"employee_id":42,"total_basic_pay_for_year":0,"monthly_13th_month_amount":0.0} 
