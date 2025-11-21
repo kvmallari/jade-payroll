@@ -396,58 +396,58 @@
 </div>
 
 <!-- Edit Schedule Modal -->
-<div id="editScheduleModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-40">
-<div class="flex items-center justify-center min-h-screen px-4">
-    <div class="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-screen overflow-y-auto">
-        <form method="POST" id="editScheduleForm">
-            @csrf
-            @method('PUT')
-            <div class="px-4 py-5 border-b border-gray-200">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-lg font-medium text-gray-900">
-                        Edit Pay Schedule
-                    </h3>
-                    <button type="button" onclick="closeEditScheduleModal()" 
-                            class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
+<div id="editScheduleModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto hidden z-50">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+        <div class="bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all w-full max-w-md">
+            <form method="POST" id="editScheduleForm">
+                @csrf
+                @method('PUT')
+                <div class="bg-white px-4 pt-5 pb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="edit-modal-title">
+                            Edit Pay Schedule
+                        </h3>
+                        <button type="button" onclick="closeEditScheduleModal()" 
+                                class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <input type="hidden" name="type" id="editScheduleType">
+                        
+                        <div>
+                            <label for="editScheduleName" class="block text-sm font-medium text-gray-700">Schedule Name</label>
+                            <input type="text" name="name" id="editScheduleName" required
+                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                   placeholder="Enter a descriptive name for this schedule">
+                        </div>
+
+                        <!-- Dynamic fields based on schedule type -->
+                        <div id="editDynamicFields"></div>
+
+                        <div class="flex items-center">
+                            <input type="checkbox" name="is_active" id="editIsActive" value="1"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="editIsActive" class="ml-2 block text-sm text-gray-900">
+                                Active schedule
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="space-y-4">
-                    <input type="hidden" name="type" id="editScheduleType">
-                    
-                    <div>
-                        <label for="editScheduleName" class="block text-sm font-medium text-gray-700">Schedule Name</label>
-                        <input type="text" name="name" id="editScheduleName" required
-                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               placeholder="Enter a descriptive name for this schedule">
-                    </div>
-
-                    <!-- Dynamic fields based on schedule type -->
-                    <div id="editDynamicFields"></div>
-
-                    <div class="flex items-center">
-                        <input type="checkbox" name="is_active" id="editIsActive" value="1"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="editIsActive" class="ml-2 block text-sm text-gray-900">
-                            Active schedule
-                        </label>
-                    </div>
+                <div class="bg-gray-50 px-4 py-3 flex justify-end space-x-3">
+                    <button type="button" onclick="closeEditScheduleModal()" 
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+                        Update Schedule
+                    </button>
                 </div>
-            </div>
-            
-            <div class="bg-gray-50 px-4 py-3 flex justify-end space-x-3">
-                <button type="button" onclick="closeEditScheduleModal()" 
-                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">
-                    Cancel
-                </button>
-                <button type="submit" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
-                    Update Schedule
-                </button>
-            </div>
         </form>
     </div>
 </div>
@@ -754,18 +754,21 @@ function generateDynamicFields(type) {
                             <div class="grid grid-cols-3 gap-3">
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Start Day</label>
-                                    <input type="number" name="cutoff_periods[0][start_day]" min="1" max="31" required
+                                    <input type="text" name="cutoff_periods[0][start_day]" required placeholder="1-31 or EOM"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">End Day</label>
-                                    <input type="number" name="cutoff_periods[0][end_day]" min="1" max="31" required
+                                    <input type="text" name="cutoff_periods[0][end_day]" required placeholder="1-31 or EOM"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Pay Date</label>
-                                    <input type="number" name="cutoff_periods[0][pay_date]" min="1" max="31" required
+                                    <input type="text" name="cutoff_periods[0][pay_date]" required placeholder="1-31 or EOM"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                             </div>
                         </div>
@@ -774,8 +777,9 @@ function generateDynamicFields(type) {
                             <div class="grid grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Start Day</label>
-                                    <input type="number" name="cutoff_periods[1][start_day]" min="1" max="31" required
+                                    <input type="text" name="cutoff_periods[1][start_day]" required placeholder="1-31 or EOM"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                                 <div>
                                     
@@ -785,8 +789,9 @@ function generateDynamicFields(type) {
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Pay Date</label>
-                                    <input type="number" name="cutoff_periods[1][pay_date]" min="1" max="31" required
+                                    <input type="text" name="cutoff_periods[1][pay_date]" required placeholder="1-31 or EOM"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                             </div>
                         </div>
@@ -803,18 +808,21 @@ function generateDynamicFields(type) {
                         <div class="grid grid-cols-3 gap-4">
                             <div>
                                 <label for="monthlyStartDay" class="block text-sm text-gray-600">Start Day</label>
-                                <input type="number" name="cutoff_periods[0][start_day]" id="monthlyStartDay" min="1" max="31" required
+                                <input type="text" name="cutoff_periods[0][start_day]" id="monthlyStartDay" required placeholder="1-31 or EOM"
                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                             </div>
                             <div>
                                 <label for="monthlyEndDay" class="block text-sm text-gray-600">End Day</label>
-                                <input type="text" name="cutoff_periods[0][end_day]" id="monthlyEndDay" required
+                                <input type="text" name="cutoff_periods[0][end_day]" id="monthlyEndDay" required placeholder="1-31 or EOM"
                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                             </div>
                             <div>
                                 <label for="monthlyPayDate" class="block text-sm text-gray-600">Pay Date</label>
-                                <input type="number" name="cutoff_periods[0][pay_date]" id="monthlyPayDate" min="1" max="31" required
+                                <input type="text" name="cutoff_periods[0][pay_date]" id="monthlyPayDate" required placeholder="1-31 or EOM"
                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                             </div>
                         </div>
                     </div>
@@ -1022,6 +1030,15 @@ function populateEditModal(schedule) {
     // Set form action
     document.getElementById('editScheduleForm').action = `/settings/pay-schedules/${schedule.id}`;
     
+    // Update modal title
+    const typeNames = {
+        daily: 'Daily',
+        weekly: 'Weekly',
+        semi_monthly: 'Semi-Monthly',
+        monthly: 'Monthly'
+    };
+    document.getElementById('edit-modal-title').textContent = `Edit ${typeNames[schedule.type]} Pay Schedule`;
+    
     // Populate basic fields
     document.getElementById('editScheduleName').value = schedule.name;
     document.getElementById('editScheduleType').value = schedule.type;
@@ -1035,24 +1052,34 @@ function generateEditDynamicFields(type, schedule) {
     const container = document.getElementById('editDynamicFields');
     let fields = '';
     
+    // Helper function to get values safely
+    const getValue = (path, defaultValue = '') => {
+        const keys = path.split('.');
+        let current = schedule;
+        for (const key of keys) {
+            if (current && typeof current === 'object' && key in current) {
+                current = current[key];
+            } else {
+                return defaultValue;
+            }
+        }
+        return current || defaultValue;
+    };
+    
     switch(type) {
         case 'daily':
             fields = `
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Daily Configuration</label>
-                    <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pay Day Configuration</label>
+                    <div class="space-y-2">
                         <div>
-                            <label class="block text-xs text-gray-600 mb-1">Pay Day (Day of Week)</label>
-                            <select name="cutoff_periods[0][pay_day]" required
-                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                                <option value="">Select Pay Day</option>
-                                <option value="monday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'monday' ? 'selected' : ''}>Monday</option>
-                                <option value="tuesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'tuesday' ? 'selected' : ''}>Tuesday</option>
-                                <option value="wednesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'wednesday' ? 'selected' : ''}>Wednesday</option>
-                                <option value="thursday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'thursday' ? 'selected' : ''}>Thursday</option>
-                                <option value="friday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'friday' ? 'selected' : ''}>Friday</option>
-                                <option value="saturday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'saturday' ? 'selected' : ''}>Saturday</option>
-                                <option value="sunday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'sunday' ? 'selected' : ''}>Sunday</option>
+                            <label for="editPayDay" class="block text-sm text-gray-600">Pay Day</label>
+                            <select name="cutoff_periods[0][pay_day]" id="editPayDay" required
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">Select pay day</option>
+                                <option value="same_day" ${getValue('cutoff_periods.0.pay_day') === 'same_day' ? 'selected' : ''}>Same Day</option>
+                                <option value="next_day" ${getValue('cutoff_periods.0.pay_day') === 'next_day' ? 'selected' : ''}>Next Day</option>
+                                <option value="friday" ${getValue('cutoff_periods.0.pay_day') === 'friday' ? 'selected' : ''}>Every Friday</option>
                             </select>
                         </div>
                     </div>
@@ -1063,50 +1090,40 @@ function generateEditDynamicFields(type, schedule) {
         case 'weekly':
             fields = `
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Weekly Configuration</label>
-                    <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Weekly Cycle Configuration</label>
+                    <div class="space-y-2">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs text-gray-600 mb-1">Start Day</label>
-                                <select name="cutoff_periods[0][start_day]" required
-                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                                    <option value="">Select Start Day</option>
-                                    <option value="monday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].start_day === 'monday' ? 'selected' : ''}>Monday</option>
-                                    <option value="tuesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].start_day === 'tuesday' ? 'selected' : ''}>Tuesday</option>
-                                    <option value="wednesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].start_day === 'wednesday' ? 'selected' : ''}>Wednesday</option>
-                                    <option value="thursday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].start_day === 'thursday' ? 'selected' : ''}>Thursday</option>
-                                    <option value="friday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].start_day === 'friday' ? 'selected' : ''}>Friday</option>
-                                    <option value="saturday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].start_day === 'saturday' ? 'selected' : ''}>Saturday</option>
-                                    <option value="sunday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].start_day === 'sunday' ? 'selected' : ''}>Sunday</option>
+                                <label for="editStartDay" class="block text-sm text-gray-600">Start Day</label>
+                                <select name="cutoff_periods[0][start_day]" id="editStartDay" required
+                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="">Select start day</option>
+                                    <option value="monday" ${getValue('cutoff_periods.0.start_day') === 'monday' ? 'selected' : ''}>Monday</option>
+                                    <option value="sunday" ${getValue('cutoff_periods.0.start_day') === 'sunday' ? 'selected' : ''}>Sunday</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-600 mb-1">End Day</label>
-                                <select name="cutoff_periods[0][end_day]" required
-                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                                    <option value="">Select End Day</option>
-                                    <option value="monday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].end_day === 'monday' ? 'selected' : ''}>Monday</option>
-                                    <option value="tuesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].end_day === 'tuesday' ? 'selected' : ''}>Tuesday</option>
-                                    <option value="wednesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].end_day === 'wednesday' ? 'selected' : ''}>Wednesday</option>
-                                    <option value="thursday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].end_day === 'thursday' ? 'selected' : ''}>Thursday</option>
-                                    <option value="friday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].end_day === 'friday' ? 'selected' : ''}>Friday</option>
-                                    <option value="saturday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].end_day === 'saturday' ? 'selected' : ''}>Saturday</option>
-                                    <option value="sunday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].end_day === 'sunday' ? 'selected' : ''}>Sunday</option>
+                                <label for="editEndDay" class="block text-sm text-gray-600">End Day</label>
+                                <select name="cutoff_periods[0][end_day]" id="editEndDay" required
+                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="">Select end day</option>
+                                    <option value="sunday" ${getValue('cutoff_periods.0.end_day') === 'sunday' ? 'selected' : ''}>Sunday</option>
+                                    <option value="saturday" ${getValue('cutoff_periods.0.end_day') === 'saturday' ? 'selected' : ''}>Saturday</option>
                                 </select>
                             </div>
                         </div>
                         <div>
-                            <label class="block text-xs text-gray-600 mb-1">Pay Day</label>
-                            <select name="cutoff_periods[0][pay_day]" required
-                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
-                                <option value="">Select Pay Day</option>
-                                <option value="monday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'monday' ? 'selected' : ''}>Monday</option>
-                                <option value="tuesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'tuesday' ? 'selected' : ''}>Tuesday</option>
-                                <option value="wednesday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'wednesday' ? 'selected' : ''}>Wednesday</option>
-                                <option value="thursday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'thursday' ? 'selected' : ''}>Thursday</option>
-                                <option value="friday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'friday' ? 'selected' : ''}>Friday</option>
-                                <option value="saturday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'saturday' ? 'selected' : ''}>Saturday</option>
-                                <option value="sunday" ${schedule.cutoff_periods && schedule.cutoff_periods[0] && schedule.cutoff_periods[0].pay_day === 'sunday' ? 'selected' : ''}>Sunday</option>
+                            <label for="editWeeklyPayDay" class="block text-sm text-gray-600">Pay Day</label>
+                            <select name="cutoff_periods[0][pay_day]" id="editWeeklyPayDay" required
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">Select pay day</option>
+                                <option value="friday" ${getValue('cutoff_periods.0.pay_day') === 'friday' ? 'selected' : ''}>Friday</option>
+                                <option value="thursday" ${getValue('cutoff_periods.0.pay_day') === 'thursday' ? 'selected' : ''}>Thursday</option>
+                                <option value="monday" ${getValue('cutoff_periods.0.pay_day') === 'monday' ? 'selected' : ''}>Monday</option>
+                                <option value="tuesday" ${getValue('cutoff_periods.0.pay_day') === 'tuesday' ? 'selected' : ''}>Tuesday</option>
+                                <option value="wednesday" ${getValue('cutoff_periods.0.pay_day') === 'wednesday' ? 'selected' : ''}>Wednesday</option>
+                                <option value="saturday" ${getValue('cutoff_periods.0.pay_day') === 'saturday' ? 'selected' : ''}>Saturday</option>
+                                <option value="sunday" ${getValue('cutoff_periods.0.pay_day') === 'sunday' ? 'selected' : ''}>Sunday</option>
                             </select>
                         </div>
                     </div>
@@ -1115,33 +1132,33 @@ function generateEditDynamicFields(type, schedule) {
             break;
             
         case 'semi_monthly':
-            const firstPeriod = schedule.cutoff_periods && schedule.cutoff_periods[0] ? schedule.cutoff_periods[0] : {};
-            const secondPeriod = schedule.cutoff_periods && schedule.cutoff_periods[1] ? schedule.cutoff_periods[1] : {};
-            
             fields = `
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Semi-Monthly Configuration</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Semi-Monthly Periods Configuration</label>
                     <div class="space-y-4">
                         <div class="border rounded-lg p-3 bg-gray-50">
                             <h4 class="text-sm font-medium text-gray-800 mb-2">First Period</h4>
                             <div class="grid grid-cols-3 gap-3">
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Start Day</label>
-                                    <input type="number" name="cutoff_periods[0][start_day]" min="1" max="31" required
-                                           value="${firstPeriod.start_day || ''}"
+                                    <input type="text" name="cutoff_periods[0][start_day]" required placeholder="1-31 or EOM"
+                                           value="${getValue('cutoff_periods.0.start_day')}"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">End Day</label>
-                                    <input type="number" name="cutoff_periods[0][end_day]" min="1" max="31" required
-                                           value="${firstPeriod.end_day || ''}"
+                                    <input type="text" name="cutoff_periods[0][end_day]" required placeholder="1-31 or EOM"
+                                           value="${getValue('cutoff_periods.0.end_day')}"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Pay Date</label>
-                                    <input type="number" name="cutoff_periods[0][pay_date]" min="1" max="31" required
-                                           value="${firstPeriod.pay_date || ''}"
+                                    <input type="text" name="cutoff_periods[0][pay_date]" required placeholder="1-31 or EOM"
+                                           value="${getValue('cutoff_periods.0.pay_date')}"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                             </div>
                         </div>
@@ -1150,21 +1167,24 @@ function generateEditDynamicFields(type, schedule) {
                             <div class="grid grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Start Day</label>
-                                    <input type="number" name="cutoff_periods[1][start_day]" min="1" max="31" required
-                                           value="${secondPeriod.start_day || ''}"
+                                    <input type="text" name="cutoff_periods[1][start_day]" required placeholder="1-31 or EOM"
+                                           value="${getValue('cutoff_periods.1.start_day')}"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">End Day</label>
-                                    <input type="text" name="cutoff_periods[1][end_day]" required
-                                           value="${secondPeriod.end_day || ''}"
+                                    <input type="text" name="cutoff_periods[1][end_day]" required placeholder="1-31 or EOM"
+                                           value="${getValue('cutoff_periods.1.end_day')}"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Pay Date</label>
-                                    <input type="number" name="cutoff_periods[1][pay_date]" min="1" max="31" required
-                                           value="${secondPeriod.pay_date || ''}"
+                                    <input type="text" name="cutoff_periods[1][pay_date]" required placeholder="1-31 or EOM"
+                                           value="${getValue('cutoff_periods.1.pay_date')}"
                                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 </div>
                             </div>
                         </div>
@@ -1174,30 +1194,31 @@ function generateEditDynamicFields(type, schedule) {
             break;
             
         case 'monthly':
-            const monthlyPeriod = schedule.cutoff_periods && schedule.cutoff_periods[0] ? schedule.cutoff_periods[0] : {};
-            
             fields = `
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Monthly Period Configuration</label>
-                    <div class="space-y-3">
+                    <div class="space-y-2">
                         <div class="grid grid-cols-3 gap-4">
                             <div>
-                                <label class="block text-xs text-gray-600 mb-1">Start Day</label>
-                                <input type="number" name="cutoff_periods[0][start_day]" min="1" max="31" required
-                                       value="${monthlyPeriod.start_day || ''}"
-                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                <label for="editMonthlyStartDay" class="block text-sm text-gray-600">Start Day</label>
+                                <input type="text" name="cutoff_periods[0][start_day]" id="editMonthlyStartDay" required placeholder="1-31 or EOM"
+                                       value="${getValue('cutoff_periods.0.start_day')}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-600 mb-1">End Day</label>
-                                <input type="text" name="cutoff_periods[0][end_day]" required placeholder="e.g., 'last_day', '30', etc."
-                                       value="${monthlyPeriod.end_day || ''}"
-                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                <label for="editMonthlyEndDay" class="block text-sm text-gray-600">End Day</label>
+                                <input type="text" name="cutoff_periods[0][end_day]" id="editMonthlyEndDay" required placeholder="1-31 or EOM"
+                                       value="${getValue('cutoff_periods.0.end_day')}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-600 mb-1">Pay Day</label>
-                                <input type="number" name="cutoff_periods[0][pay_day]" min="1" max="31" required
-                                       value="${monthlyPeriod.pay_day || ''}"
-                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                <label for="editMonthlyPayDate" class="block text-sm text-gray-600">Pay Date</label>
+                                <input type="text" name="cutoff_periods[0][pay_date]" id="editMonthlyPayDate" required placeholder="1-31 or EOM"
+                                       value="${getValue('cutoff_periods.0.pay_date')}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                             </div>
                         </div>
                     </div>

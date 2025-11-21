@@ -123,27 +123,30 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="cutoff_1_start" class="block text-sm font-medium text-gray-700 mb-2">Start Day</label>
-                                <input type="number" name="cutoff_1_start" id="cutoff_1_start" min="1" max="31"
+                                <input type="text" name="cutoff_1_start" id="cutoff_1_start" placeholder="Day (1-31) or EOM"
                                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                        value="{{ old('cutoff_1_start', $paySchedule->cutoff_periods[0]['start_day'] ?? '') }}" required>
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 @error('cutoff_1_start')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                             <div>
                                 <label for="cutoff_1_end" class="block text-sm font-medium text-gray-700 mb-2">End Day</label>
-                                <input type="number" name="cutoff_1_end" id="cutoff_1_end" min="1" max="31"
+                                <input type="text" name="cutoff_1_end" id="cutoff_1_end" placeholder="Day (1-31) or EOM"
                                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                        value="{{ old('cutoff_1_end', $paySchedule->cutoff_periods[0]['end_day'] ?? '') }}" required>
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 @error('cutoff_1_end')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                             <div>
                                 <label for="pay_date_1" class="block text-sm font-medium text-gray-700 mb-2">Pay Date</label>
-                                <input type="number" name="pay_date_1" id="pay_date_1" min="1" max="31"
+                                <input type="text" name="pay_date_1" id="pay_date_1" placeholder="Day (1-31) or EOM"
                                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                        value="{{ old('pay_date_1', $paySchedule->cutoff_periods[0]['pay_date'] ?? '') }}" required>
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 @error('pay_date_1')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -157,29 +160,30 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="cutoff_2_start" class="block text-sm font-medium text-gray-700 mb-2">Start Day</label>
-                                <input type="number" name="cutoff_2_start" id="cutoff_2_start" min="1" max="31"
+                                <input type="text" name="cutoff_2_start" id="cutoff_2_start" placeholder="Day (1-31) or EOM"
                                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                        value="{{ old('cutoff_2_start', $paySchedule->cutoff_periods[1]['start_day'] ?? '') }}" required>
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 @error('cutoff_2_start')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                             <div>
                                 <label for="cutoff_2_end" class="block text-sm font-medium text-gray-700 mb-2">End Day</label>
-                                <input type="number" name="cutoff_2_end" id="cutoff_2_end" min="1" max="31"
+                                <input type="text" name="cutoff_2_end" id="cutoff_2_end" placeholder="Day (1-31) or EOM"
                                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                        value="{{ old('cutoff_2_end', $paySchedule->cutoff_periods[1]['end_day'] ?? '') }}" required>
-                                <p class="mt-1 text-xs text-gray-500">Use 31 for end of month</p>
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 @error('cutoff_2_end')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
                             <div>
                                 <label for="pay_date_2" class="block text-sm font-medium text-gray-700 mb-2">Pay Date</label>
-                                <input type="number" name="pay_date_2" id="pay_date_2" min="1" max="31"
+                                <input type="text" name="pay_date_2" id="pay_date_2" placeholder="Day (1-31) or EOM"
                                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                        value="{{ old('pay_date_2', $paySchedule->cutoff_periods[1]['pay_date'] ?? '') }}" required>
-                                <p class="mt-1 text-xs text-gray-500">Next month if > end day</p>
+                                <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                                 @error('pay_date_2')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -193,9 +197,10 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div>
                         <label for="cutoff_start_day" class="block text-sm font-medium text-gray-700 mb-2">Cut-off Start Day</label>
-                        <input type="number" name="cutoff_start_day" id="cutoff_start_day" min="1" max="31"
+                        <input type="text" name="cutoff_start_day" id="cutoff_start_day" placeholder="Day (1-31) or EOM"
                                class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                value="{{ old('cutoff_start_day', $paySchedule->cutoff_periods[0]['start_day'] ?? '') }}" required>
+                        <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                         @error('cutoff_start_day')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -203,10 +208,10 @@
 
                     <div>
                         <label for="cutoff_end_day" class="block text-sm font-medium text-gray-700 mb-2">Cut-off End Day</label>
-                        <input type="number" name="cutoff_end_day" id="cutoff_end_day" min="1" max="31"
+                        <input type="text" name="cutoff_end_day" id="cutoff_end_day" placeholder="Day (1-31) or EOM"
                                class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                value="{{ old('cutoff_end_day', $paySchedule->cutoff_periods[0]['end_day'] ?? '') }}" required>
-                        <p class="mt-1 text-xs text-gray-500">Use 31 for end of month</p>
+                        <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                         @error('cutoff_end_day')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -214,10 +219,10 @@
 
                     <div>
                         <label for="pay_date" class="block text-sm font-medium text-gray-700 mb-2">Pay Date</label>
-                        <input type="number" name="pay_date" id="pay_date" min="1" max="31"
+                        <input type="text" name="pay_date" id="pay_date" placeholder="Day (1-31) or EOM"
                                class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
                                value="{{ old('pay_date', $paySchedule->cutoff_periods[0]['pay_date'] ?? '') }}" required>
-                        <p class="mt-1 text-xs text-gray-500">Next month if after end day</p>
+                        <div class="text-xs text-gray-500 mt-1">Enter 1-31 or 'EOM' for end of month</div>
                         @error('pay_date')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror

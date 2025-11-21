@@ -2959,6 +2959,125 @@ class PayrollController extends Controller
             ->with('success', 'Viewing draft payrolls. Review and process individual employees as needed.');
     }
 
+    /**
+     * Submit batch payrolls from automation preview
+     */
+    public function automationSubmit(Request $request, $schedule)
+    {
+        $this->authorize('create payrolls');
+
+        // Find the pay schedule by name
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
+            ->first();
+
+        if (!$paySchedule) {
+            return redirect()->back()
+                ->with('error', 'Pay schedule not found or inactive.');
+        }
+
+        // Get the current period for this schedule
+        try {
+            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        } catch (\Exception $e) {
+            Log::error('Failed to calculate current period for batch submission', [
+                'schedule' => $schedule,
+                'error' => $e->getMessage()
+            ]);
+            return redirect()->back()
+                ->with('error', 'Unable to determine current pay period.');
+        }
+
+        // Get all active employees for this schedule
+        $employees = Employee::where('pay_schedule', $paySchedule->name)
+            ->whereNull('terminated_at')
+            ->with(['timeSchedule', 'daySchedule'])
+            ->get();
+
+        if ($employees->isEmpty()) {
+            return redirect()->back()
+                ->with('error', 'No active employees found for this pay schedule.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $createdPayrolls = [];
+
+            foreach ($employees as $employee) {
+                // Check if employee already has a payroll for this period
+                $existingPayroll = Payroll::where('employee_id', $employee->id)
+                    ->where('period_start', $currentPeriod['start'])
+                    ->where('period_end', $currentPeriod['end'])
+                    ->first();
+
+                if ($existingPayroll) {
+                    continue; // Skip if payroll already exists
+                }
+
+                // Calculate payroll for this employee
+                $payrollCalculation = $this->calculateEmployeePayrollForPeriod($employee, $currentPeriod['start'], $currentPeriod['end']);
+
+                // Create the payroll record
+                $payroll = Payroll::create([
+                    'employee_id' => $employee->id,
+                    'payroll_number' => Payroll::generatePayrollNumber('automated'),
+                    'period_start' => $currentPeriod['start'],
+                    'period_end' => $currentPeriod['end'],
+                    'pay_date' => $currentPeriod['pay_date'],
+                    'status' => 'draft',
+                    'payroll_type' => 'automated',
+                    'total_gross' => $payrollCalculation['gross_pay'] ?? 0,
+                    'total_deductions' => $payrollCalculation['total_deductions'] ?? 0,
+                    'total_net' => $payrollCalculation['net_pay'] ?? 0,
+                    'created_by' => Auth::id(),
+                    'pay_schedule' => $paySchedule->name,
+                ]);
+
+                // Create payroll detail
+                PayrollDetail::create([
+                    'payroll_id' => $payroll->id,
+                    'employee_id' => $employee->id,
+                    'basic_pay' => $payrollCalculation['basic_pay'] ?? 0,
+                    'overtime_pay' => $payrollCalculation['overtime_pay'] ?? 0,
+                    'holiday_pay' => $payrollCalculation['holiday_pay'] ?? 0,
+                    'night_differential' => $payrollCalculation['night_differential'] ?? 0,
+                    'allowances' => $payrollCalculation['allowances'] ?? 0,
+                    'bonuses' => $payrollCalculation['bonuses'] ?? 0,
+                    'gross_pay' => $payrollCalculation['gross_pay'] ?? 0,
+                    'sss_contribution' => $payrollCalculation['sss_deduction'] ?? 0,
+                    'philhealth_contribution' => $payrollCalculation['philhealth_deduction'] ?? 0,
+                    'pagibig_contribution' => $payrollCalculation['pagibig_deduction'] ?? 0,
+                    'withholding_tax' => $payrollCalculation['withholding_tax'] ?? 0,
+                    'other_deductions' => $payrollCalculation['other_deductions'] ?? 0,
+                    'total_deductions' => $payrollCalculation['total_deductions'] ?? 0,
+                    'net_pay' => $payrollCalculation['net_pay'] ?? 0,
+                ]);
+
+                $createdPayrolls[] = $payroll;
+            }
+
+            DB::commit();
+
+            if (empty($createdPayrolls)) {
+                return redirect()->route('payrolls.automation.list', $schedule)
+                    ->with('warning', 'All employees already have payrolls for this period.');
+            }
+
+            return redirect()->route('payrolls.automation.list', $schedule)
+                ->with('success', 'Successfully created ' . count($createdPayrolls) . ' payroll(s) for processing.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to create batch payrolls', [
+                'schedule' => $schedule,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->back()
+                ->with('error', 'Failed to create payrolls: ' . $e->getMessage());
+        }
+    }
+
     // Manual payroll functionality removed
 
     /**
@@ -5637,9 +5756,9 @@ class PayrollController extends Controller
                 } else {
                     // Period is within same month
                     $start = $currentDate->copy()->day($firstPeriodStart);
-                    if ($firstPeriodEnd == 31) {
+                    if ($firstPeriodEnd == 31 || $firstPeriodEnd === 'EOD' || $firstPeriodEnd === 'eod' || $firstPeriodEnd === 'EOM') {
                         $end = $currentDate->copy()->endOfMonth();
-                        $periodName = $start->format('M') . ' ' . $firstPeriodStart . '-EOD';
+                        $periodName = $start->format('M') . ' ' . $firstPeriodStart . '-EOM';
                     } else {
                         $end = $currentDate->copy()->day($firstPeriodEnd);
                         $periodName = $start->format('M') . ' ' . $firstPeriodStart . '-' . $firstPeriodEnd;
@@ -5664,9 +5783,9 @@ class PayrollController extends Controller
                 } else {
                     // Period is within same month
                     $start = $currentDate->copy()->day($secondPeriodStart);
-                    if ($secondPeriodEnd == 31) {
+                    if ($secondPeriodEnd == 31 || $secondPeriodEnd === 'EOD' || $secondPeriodEnd === 'eod' || $secondPeriodEnd === 'EOM') {
                         $end = $currentDate->copy()->endOfMonth();
-                        $periodName = $start->format('M') . ' ' . $secondPeriodStart . '-EOD';
+                        $periodName = $start->format('M') . ' ' . $secondPeriodStart . '-EOM';
                     } else {
                         $end = $currentDate->copy()->day($secondPeriodEnd);
                         $periodName = $start->format('M') . ' ' . $secondPeriodStart . '-' . $secondPeriodEnd;
@@ -5676,7 +5795,7 @@ class PayrollController extends Controller
             }
 
             // Set pay date - always in current month
-            if ($payDay == 31) {
+            if ($payDay == 31 || $payDay === 'EOD' || $payDay === 'eod' || $payDay === 'EOM') {
                 $payDate = $currentDate->copy()->endOfMonth();
             } else {
                 $payDate = $currentDate->copy()->day($payDay);
@@ -6003,7 +6122,7 @@ class PayrollController extends Controller
         }
 
         // Set pay date - always in current month
-        if ($payDay == 31) {
+        if ($payDay == 31 || $payDay === 'EOD' || $payDay === 'eod' || $payDay === 'EOM') {
             $payDate = $currentDate->copy()->endOfMonth();
         } else {
             $payDate = $currentDate->copy()->day($payDay);
@@ -6037,13 +6156,13 @@ class PayrollController extends Controller
 
         $periodStart = $currentDate->copy()->startOfMonth()->day($startDay);
 
-        if ($endDay == 31) {
+        if ($endDay == 31 || $endDay === 'EOD' || $endDay === 'eod' || $endDay === 'EOM') {
             $periodEnd = $currentDate->copy()->endOfMonth();
         } else {
             $periodEnd = $currentDate->copy()->startOfMonth()->day($endDay);
         }
 
-        if ($payDay == 31) {
+        if ($payDay == 31 || $payDay === 'EOD' || $payDay === 'eod' || $payDay === 'EOM') {
             $payDate = $periodEnd->copy()->endOfMonth();
         } else {
             $payDate = $currentDate->copy()->startOfMonth()->day($payDay);
@@ -6324,10 +6443,10 @@ class PayrollController extends Controller
         $firstPeriod = $periods[0];
         $secondPeriod = $periods[1];
 
-        // Handle EOD values
-        $firstPayDay = ($firstPeriod['pay_date'] === 'EOD' || $firstPeriod['pay_date'] === 'eod')
+        // Handle EOD and EOM values
+        $firstPayDay = ($firstPeriod['pay_date'] === 'EOD' || $firstPeriod['pay_date'] === 'eod' || $firstPeriod['pay_date'] === 'EOM')
             ? $currentDate->daysInMonth : (int)$firstPeriod['pay_date'];
-        $secondPayDay = ($secondPeriod['pay_date'] === 'EOD' || $secondPeriod['pay_date'] === 'eod')
+        $secondPayDay = ($secondPeriod['pay_date'] === 'EOD' || $secondPeriod['pay_date'] === 'eod' || $secondPeriod['pay_date'] === 'EOM')
             ? $currentDate->daysInMonth : (int)$secondPeriod['pay_date'];
 
         // Corrected pay date cutoff logic:
@@ -6368,16 +6487,16 @@ class PayrollController extends Controller
         $endDay = $period['end_day'];
         $currentDay = $currentDate->day;
 
-        // Handle EOD (End of Day) values with proper month context
-        if ($startDay === 'EOD' || $startDay === 'eod') {
-            // For start_day EOD, use last day of current month
+        // Handle EOD and EOM (End of Day/Month) values with proper month context
+        if ($startDay === 'EOD' || $startDay === 'eod' || $startDay === 'EOM') {
+            // For start_day EOD/EOM, use last day of current month
             $startDay = $currentDate->daysInMonth;
         } else {
             $startDay = (int)$startDay;
         }
 
-        if ($endDay === 'EOD' || $endDay === 'eod') {
-            // For end_day EOD, determine the appropriate month based on period logic
+        if ($endDay === 'EOD' || $endDay === 'eod' || $endDay === 'EOM') {
+            // For end_day EOD/EOM, determine the appropriate month based on period logic
             if ($startDay <= $currentDate->daysInMonth) {
                 // Period likely within same month, use current month's last day
                 $endDay = $currentDate->daysInMonth;
@@ -6410,34 +6529,34 @@ class PayrollController extends Controller
 
         $baseDate = Carbon::create($year, $month, 1);
 
-        // Enhanced EOD (End of Day) handling with proper month context
-        if ($startDay === 'EOD' || $startDay === 'eod') {
-            // For start_day EOD, use last day of the base month
+        // Enhanced EOD/EOM (End of Day/Month) handling with proper month context
+        if ($startDay === 'EOD' || $startDay === 'eod' || $startDay === 'EOM') {
+            // For start_day EOD/EOM, use last day of the base month
             $startDay = (int) $baseDate->daysInMonth;
         } else {
             $startDay = (int) $startDay;
         }
 
-        if ($endDay === 'EOD' || $endDay === 'eod') {
-            // For end_day EOD, determine appropriate month based on period flow
+        if ($endDay === 'EOD' || $endDay === 'eod' || $endDay === 'EOM') {
+            // For end_day EOD/EOM, determine appropriate month based on period flow
             if ($startDay <= $baseDate->daysInMonth) {
-                // Period starts within current month, end EOD is current month's last day
+                // Period starts within current month, end EOD/EOM is current month's last day
                 $endDay = (int) $baseDate->daysInMonth;
             } else {
-                // Period spans months, end EOD is next month's last day
+                // Period spans months, end EOD/EOM is next month's last day
                 $endDay = (int) $baseDate->copy()->addMonth()->daysInMonth;
             }
         } else {
             $endDay = (int) $endDay;
         }
 
-        if ($payDay === 'EOD' || $payDay === 'eod') {
-            // For pay_date EOD, determine appropriate month based on period end
+        if ($payDay === 'EOD' || $payDay === 'eod' || $payDay === 'EOM') {
+            // For pay_date EOD/EOM, determine appropriate month based on period end
             if ($startDay <= $endDay) {
-                // Period within same month, pay EOD is current month's last day
+                // Period within same month, pay EOD/EOM is current month's last day
                 $payDay = (int) $baseDate->daysInMonth;
             } else {
-                // Period spans months, pay EOD could be next month's last day
+                // Period spans months, pay EOD/EOM could be next month's last day
                 $payDay = (int) $baseDate->copy()->addMonth()->daysInMonth;
             }
         } else {
@@ -6487,11 +6606,11 @@ class PayrollController extends Controller
         $endDay = $cutoff['end_day'];
         $payDay = $cutoff['pay_date'];
 
-        // Handle EOD (End of Day) values - convert to actual last day of month
-        if ($endDay === 'EOD' || $endDay === 'eod') {
+        // Handle EOD/EOM (End of Day/Month) values - convert to actual last day of month
+        if ($endDay === 'EOD' || $endDay === 'eod' || $endDay === 'EOM') {
             $endDay = (int) Carbon::create($currentYear, $currentMonth)->daysInMonth;
         }
-        if ($payDay === 'EOD' || $payDay === 'eod') {
+        if ($payDay === 'EOD' || $payDay === 'eod' || $payDay === 'EOM') {
             $payDay = (int) Carbon::create($currentYear, $currentMonth)->daysInMonth;
         }
 
@@ -6733,6 +6852,10 @@ class PayrollController extends Controller
         }
         if ($dayString === '31st' || $dayString === '31') {
             return 31;
+        }
+        // Handle EOD and EOM special values by returning them as strings
+        if ($dayString === 'EOD' || $dayString === 'eod' || $dayString === 'EOM') {
+            return $dayString;
         }
         return (int) preg_replace('/[^0-9]/', '', $dayString);
     }
@@ -9144,7 +9267,7 @@ class PayrollController extends Controller
         // First, check if this ID is a payroll ID (for saved/historical payrolls)
         $payroll = Payroll::with(['payrollDetails.employee', 'creator', 'approver'])
             ->where('id', $id)
-            ->where('pay_schedule', $selectedSchedule->code)
+            ->where('pay_schedule', $schedule)
             ->first();
 
         if ($payroll) {
@@ -9180,7 +9303,7 @@ class PayrollController extends Controller
         $existingPayroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
             $query->where('employee_id', $employee->id);
         })
-            ->where('pay_schedule', $selectedSchedule->code)
+            ->where('pay_schedule', $schedule)
             ->where('period_start', $currentPeriod['start'])
             ->where('period_end', $currentPeriod['end'])
             ->where('payroll_type', 'automated')
@@ -9203,7 +9326,22 @@ class PayrollController extends Controller
      */
     public function processUnifiedPayroll(Request $request, $schedule, $id)
     {
-        $this->authorize('create payrolls');
+        // \Log::info('ProcessUnifiedPayroll called', ['schedule' => $schedule, 'id' => $id, 'user' => auth()->id()]);
+
+        // // Check if user is authenticated
+        // if (!auth()->check()) {
+        //     \Log::error('User not authenticated for payroll processing');
+        //     return redirect()->back()->with('error', 'You must be logged in to process payrolls.');
+        // }
+
+        // // Check authorization
+        // try {
+        //     $this->authorize('create payrolls');
+        //     \Log::info('User authorized for payroll processing');
+        // } catch (\Exception $e) {
+        //     \Log::error('Authorization failed for payroll processing', ['error' => $e->getMessage(), 'user' => auth()->id()]);
+        //     return redirect()->back()->with('error', 'You do not have permission to process payrolls.');
+        // }
 
         $employee = Employee::with(['timeSchedule', 'daySchedule'])->findOrFail($id);
 
@@ -9245,7 +9383,7 @@ class PayrollController extends Controller
         $existingPayroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
             $query->where('employee_id', $employee->id);
         })
-            ->where('pay_schedule', $selectedSchedule->code)
+            ->where('pay_schedule', $schedule)
             ->where('period_start', $currentPeriod['start'])
             ->where('period_end', $currentPeriod['end'])
             ->where('payroll_type', 'automated')
@@ -9261,7 +9399,16 @@ class PayrollController extends Controller
         try {
             // Create payroll with snapshots
             $employees = collect([$employee]);
-            $createdPayroll = $this->autoCreatePayrollForPeriod($selectedSchedule, $currentPeriod, $employees, 'processing');
+
+            // Create a temporary schedule object with the correct schedule name for payroll creation
+            $scheduleForCreation = (object) [
+                'code' => $schedule,  // Use the actual schedule name from URL
+                'name' => $selectedSchedule->name,
+                'type' => $selectedSchedule->type,
+                'id' => $selectedSchedule->id ?? null
+            ];
+
+            $createdPayroll = $this->autoCreatePayrollForPeriod($scheduleForCreation, $currentPeriod, $employees, 'processing');
 
             // Redirect to payroll ID URL instead of employee ID
             return redirect()->route('payrolls.automation.show', [
@@ -9327,7 +9474,7 @@ class PayrollController extends Controller
             $payrolls = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
                 $query->where('employee_id', $employee->id);
             })
-                ->where('pay_schedule', $selectedSchedule->code)
+                ->where('pay_schedule', $schedule)
                 ->where('period_start', $currentPeriod['start'])
                 ->where('period_end', $currentPeriod['end'])
                 ->where('payroll_type', 'automated')
@@ -9405,7 +9552,7 @@ class PayrollController extends Controller
         $payroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
             $query->where('employee_id', $employee->id);
         })
-            ->where('pay_schedule', $selectedSchedule->code)
+            ->where('pay_schedule', $schedule)
             ->where('period_start', $currentPeriod['start'])
             ->where('period_end', $currentPeriod['end'])
             ->where('payroll_type', 'automated')

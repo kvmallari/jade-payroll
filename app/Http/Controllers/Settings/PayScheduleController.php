@@ -52,6 +52,9 @@ class PayScheduleController extends Controller
             'type' => 'required|in:daily,weekly,semi_monthly,monthly',
             'is_active' => 'boolean',
             'cutoff_periods' => 'required|array',
+            'cutoff_periods.*.start_day' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+            'cutoff_periods.*.end_day' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+            'cutoff_periods.*.pay_date' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
         ]);
 
         $schedule = PaySchedule::create([
@@ -130,21 +133,21 @@ class PayScheduleController extends Controller
                 case 'semi_monthly':
                     $rules = array_merge($rules, [
                         // First cutoff period
-                        'cutoff_1_start' => 'required|integer|between:1,31',
-                        'cutoff_1_end' => 'required|integer|between:1,31',
-                        'pay_date_1' => 'required|integer|between:1,31',
+                        'cutoff_1_start' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+                        'cutoff_1_end' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+                        'pay_date_1' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
                         // Second cutoff period  
-                        'cutoff_2_start' => 'required|integer|between:1,31',
-                        'cutoff_2_end' => 'required|integer|between:1,31',
-                        'pay_date_2' => 'required|integer|between:1,31',
+                        'cutoff_2_start' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+                        'cutoff_2_end' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+                        'pay_date_2' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
                     ]);
                     break;
 
                 case 'monthly':
                     $rules = array_merge($rules, [
-                        'cutoff_start_day' => 'required|integer|between:1,31',
-                        'cutoff_end_day' => 'required|integer|between:1,31',
-                        'pay_date' => 'required|integer|between:1,31',
+                        'cutoff_start_day' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+                        'cutoff_end_day' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
+                        'pay_date' => 'required|regex:/^(3[01]|[12][0-9]|[1-9]|EOM)$/',
                     ]);
                     break;
             }
