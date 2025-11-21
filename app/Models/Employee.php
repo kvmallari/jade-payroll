@@ -33,6 +33,7 @@ class Employee extends Model
         'employment_type_id',
         'employment_status',
         'pay_schedule',
+        'pay_schedule_id',
         'time_schedule_id',
         'day_schedule_id',
         'sss_number',
@@ -137,6 +138,14 @@ class Employee extends Model
     public function employmentType()
     {
         return $this->belongsTo(EmploymentType::class);
+    }
+
+    /**
+     * Get the pay schedule of the employee (new multiple schedules system)
+     */
+    public function paySchedule()
+    {
+        return $this->belongsTo(PaySchedule::class, 'pay_schedule_id');
     }
 
     /**

@@ -49,6 +49,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('employees/calculate-deductions', [EmployeeController::class, 'calculateDeductions'])->name('employees.calculate-deductions');
         // API endpoint for checking duplicate employee numbers
         Route::post('employees/check-duplicate', [EmployeeController::class, 'checkDuplicate'])->name('employees.check-duplicate');
+        // API endpoint for getting pay schedules by type
+        Route::get('employees/pay-schedules/{type}', [EmployeeController::class, 'getPaySchedulesByType'])->name('employees.pay-schedules-by-type');
     });
 
     // Department Management
@@ -123,6 +125,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Automated Payroll - schedule selection and auto-creation for active employees
         Route::get('payrolls/automation', [PayrollController::class, 'automationIndex'])->name('payrolls.automation.index');
+        Route::get('payrolls/automation/schedules/{frequency}', [PayrollController::class, 'automationSchedules'])->name('payrolls.automation.schedules');
         Route::get('payrolls/automation/create', [PayrollController::class, 'automationCreate'])->name('payrolls.automation.create');
         Route::post('payrolls/automation/store', [PayrollController::class, 'automationStore'])->name('payrolls.automation.store');
         Route::get('payrolls/automation/{schedule}', [PayrollController::class, 'automationList'])->name('payrolls.automation.list');
@@ -379,7 +382,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('system-settings', [SystemSettingsController::class, 'update'])->name('system-settings.update');
         Route::post('system-settings/toggle-theme', [SystemSettingsController::class, 'toggleTheme'])->name('system-settings.toggle-theme');
 
-        // Payroll Schedule Settings
+        // Pay Schedule Settings (New Multiple Schedule System)
+        Route::resource('settings/pay-schedules', \App\Http\Controllers\Settings\PayScheduleController::class)
+            ->names([
+                'index' => 'settings.pay-schedules.index',
+                'create' => 'settings.pay-schedules.create',
+                'store' => 'settings.pay-schedules.store',
+                'show' => 'settings.pay-schedules.show',
+                'edit' => 'settings.pay-schedules.edit',
+                'update' => 'settings.pay-schedules.update',
+                'destroy' => 'settings.pay-schedules.destroy'
+            ]);
+
+        // Additional pay schedule routes
+        Route::patch('settings/pay-schedules/{paySchedule}/toggle', [\App\Http\Controllers\Settings\PayScheduleController::class, 'toggle'])
+            ->name('settings.pay-schedules.toggle');
+
+        // Legacy Payroll Schedule Settings (keep for backward compatibility)
         Route::get('payroll-schedule-settings', [PayrollScheduleSettingsController::class, 'index'])->name('payroll-schedule-settings.index');
         Route::get('payroll-schedule-settings/{payrollScheduleSetting}/edit', [PayrollScheduleSettingsController::class, 'edit'])->name('payroll-schedule-settings.edit');
         Route::put('payroll-schedule-settings/{payrollScheduleSetting}', [PayrollScheduleSettingsController::class, 'update'])->name('payroll-schedule-settings.update');

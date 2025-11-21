@@ -282,13 +282,25 @@
                                 <label for="pay_schedule" class="block text-sm font-medium text-gray-700">Pay Frequency <span class="text-red-500">*</span></label>
                                 <select name="pay_schedule" id="pay_schedule" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     <option value="">Select Pay Frequency</option>
-                                    <option value="monthly" {{ old('pay_schedule', $employee->pay_schedule ?? '') == 'monthly' ? 'selected' : '' }}>Monthly</option>
-                                    <option value="semi_monthly" {{ old('pay_schedule', $employee->pay_schedule ?? '') == 'semi_monthly' ? 'selected' : '' }}>Semi-Monthly</option>
+                                    <option value="daily" {{ old('pay_schedule', $employee->pay_schedule ?? '') == 'daily' ? 'selected' : '' }}>Daily</option>
                                     <option value="weekly" {{ old('pay_schedule', $employee->pay_schedule ?? '') == 'weekly' ? 'selected' : '' }}>Weekly</option>
+                                    <option value="semi_monthly" {{ old('pay_schedule', $employee->pay_schedule ?? '') == 'semi_monthly' ? 'selected' : '' }}>Semi-Monthly</option>
+                                    <option value="monthly" {{ old('pay_schedule', $employee->pay_schedule ?? '') == 'monthly' ? 'selected' : '' }}>Monthly</option>
                                 </select>
                                 @error('pay_schedule')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
+                            </div>
+
+                            <div>
+                                <label for="pay_schedule_id" class="block text-sm font-medium text-gray-700">Pay Schedule <span class="text-red-500">*</span></label>
+                                <select name="pay_schedule_id" id="pay_schedule_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <option value="">Select specific pay schedule</option>
+                                </select>
+                                @error('pay_schedule_id')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                           
                             </div>
 
                             <div>
@@ -702,6 +714,76 @@
                 if (employmentTypeSelect.value) {
                     employmentTypeSelect.dispatchEvent(new Event('change'));
                 }
+            }
+        });
+
+        // Pay Schedule Dynamic Loading
+        document.addEventListener('DOMContentLoaded', function() {
+            const payFrequencySelect = document.getElementById('pay_schedule');
+            const payScheduleSelect = document.getElementById('pay_schedule_id');
+            const currentPayScheduleId = '{{ old('pay_schedule_id', $employee->pay_schedule_id ?? '') }}';
+
+            function loadPaySchedules(type, selectValue = null) {
+                if (type) {
+                    payScheduleSelect.innerHTML = '<option value="">Loading...</option>';
+                    payScheduleSelect.disabled = true;
+
+                    fetch(`{{ url('employees/pay-schedules') }}/${type}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        credentials: 'same-origin'
+                    })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            payScheduleSelect.innerHTML = '<option value="">Select specific pay schedule</option>';
+                            
+                            if (data.length > 0) {
+                                data.forEach(schedule => {
+                                    const option = document.createElement('option');
+                                    option.value = schedule.id;
+                                    option.textContent = schedule.name;
+                                    if (schedule.is_default) {
+                                        option.textContent += ' (Default)';
+                                    }
+                                    
+                                    // Select the current value if it matches
+                                    if (selectValue && schedule.id == selectValue) {
+                                        option.selected = true;
+                                    }
+                                    
+                                    payScheduleSelect.appendChild(option);
+                                });
+                                payScheduleSelect.disabled = false;
+                            } else {
+                                payScheduleSelect.innerHTML = '<option value="">No schedules available for this type</option>';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching pay schedules:', error);
+                            payScheduleSelect.innerHTML = `<option value="">Error loading schedules (${error.message})</option>`;
+                        });
+                } else {
+                    payScheduleSelect.innerHTML = '<option value="">First select pay frequency</option>';
+                    payScheduleSelect.disabled = true;
+                }
+            }
+
+            payFrequencySelect.addEventListener('change', function() {
+                loadPaySchedules(this.value);
+            });
+
+            // Load initial schedules if there's a selected pay frequency
+            if (payFrequencySelect.value) {
+                loadPaySchedules(payFrequencySelect.value, currentPayScheduleId);
             }
         });
     </script>

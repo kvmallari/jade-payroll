@@ -26,13 +26,13 @@ Route::middleware(['auth', 'verified'])->prefix('settings')->name('settings.')->
     // Employment Type Management
     Route::resource('employment-types', EmploymentTypeController::class);
 
-    // Pay Schedule Settings
-    Route::get('pay-schedules', [PayScheduleSettingController::class, 'index'])->name('pay-schedules.index');
-    Route::get('pay-schedules/{paySchedule}', [PayScheduleSettingController::class, 'show'])->name('pay-schedules.show');
-    Route::get('pay-schedules/{paySchedule}/edit', [PayScheduleSettingController::class, 'edit'])->name('pay-schedules.edit');
-    Route::put('pay-schedules/{paySchedule}', [PayScheduleSettingController::class, 'update'])->name('pay-schedules.update');
-    Route::patch('pay-schedules/{paySchedule}/toggle', [PayScheduleSettingController::class, 'toggle'])
-        ->name('pay-schedules.toggle');
+    // Pay Schedule Settings - DISABLED (using new PayScheduleController instead)
+    // Route::get('pay-schedules', [PayScheduleSettingController::class, 'index'])->name('pay-schedules.index');
+    // Route::get('pay-schedules/{paySchedule}', [PayScheduleSettingController::class, 'show'])->name('pay-schedules.show');
+    // Route::get('pay-schedules/{paySchedule}/edit', [PayScheduleSettingController::class, 'edit'])->name('pay-schedules.edit');
+    // Route::put('pay-schedules/{paySchedule}', [PayScheduleSettingController::class, 'update'])->name('pay-schedules.update');
+    // Route::patch('pay-schedules/{paySchedule}/toggle', [PayScheduleSettingController::class, 'toggle'])
+    //     ->name('pay-schedules.toggle');
 
     // Deduction/Tax Settings
     Route::resource('deductions', DeductionTaxSettingController::class);

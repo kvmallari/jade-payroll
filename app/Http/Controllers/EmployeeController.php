@@ -277,7 +277,8 @@ class EmployeeController extends Controller
             'benefits_status' => 'required|in:with_benefits,without_benefits',
             'employment_type_id' => 'required|exists:employment_types,id',
             'employment_status' => 'required|in:active,inactive,terminated,resigned',
-            'pay_schedule' => 'required|in:monthly,semi_monthly,weekly',
+            'pay_schedule' => 'required|in:daily,weekly,semi_monthly,monthly',
+            'pay_schedule_id' => 'required|exists:pay_schedules,id',
             'sss_number' => 'nullable|string|max:20',
             'philhealth_number' => 'nullable|string|max:20',
             'pagibig_number' => 'nullable|string|max:20',
@@ -430,7 +431,8 @@ class EmployeeController extends Controller
             'benefits_status' => 'required|in:with_benefits,without_benefits',
             'employment_type_id' => 'required|exists:employment_types,id',
             'employment_status' => 'required|in:active,inactive,terminated,resigned',
-            'pay_schedule' => 'required|in:monthly,semi_monthly,weekly',
+            'pay_schedule' => 'required|in:daily,weekly,semi_monthly,monthly',
+            'pay_schedule_id' => 'required|exists:pay_schedules,id',
             'sss_number' => 'nullable|string|max:20',
             'philhealth_number' => 'nullable|string|max:20',
             'pagibig_number' => 'nullable|string|max:20',
@@ -898,5 +900,24 @@ class EmployeeController extends Controller
 
             fclose($output);
         }, $fileName, $headers);
+    }
+
+    /**
+     * Get pay schedules by type for employee form
+     */
+    public function getPaySchedulesByType($type)
+    {
+        // Validate the type
+        if (!in_array($type, ['daily', 'weekly', 'semi_monthly', 'monthly'])) {
+            return response()->json(['error' => 'Invalid pay schedule type'], 400);
+        }
+
+        // Get active pay schedules for this type
+        $paySchedules = \App\Models\PaySchedule::where('type', $type)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'is_default']);
+
+        return response()->json($paySchedules);
     }
 }

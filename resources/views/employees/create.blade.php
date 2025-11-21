@@ -299,21 +299,25 @@
                                 <label for="pay_schedule" class="block text-sm font-medium text-gray-700">Pay Frequency <span class="text-red-500">*</span></label>
                                 <select name="pay_schedule" id="pay_schedule" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     <option value="">Select Pay Frequency</option>
-                                    @foreach($paySchedules as $paySchedule)
-                                    <option value="{{ $paySchedule->code }}"
-                                        {{ old('pay_schedule') == $paySchedule->code ? 'selected' : '' }}
-                                        {{ !$paySchedule->is_active ? 'disabled' : '' }}>
-                                        {{ $paySchedule->name }}
-                                        @if(!$paySchedule->is_active)
-                                        (Disabled - Not Configured)
-                                        @endif
-                                    </option>
-                                    @endforeach
+                                    <option value="daily" {{ old('pay_schedule') == 'daily' ? 'selected' : '' }}>Daily</option>
+                                    <option value="weekly" {{ old('pay_schedule') == 'weekly' ? 'selected' : '' }}>Weekly</option>
+                                    <option value="semi_monthly" {{ old('pay_schedule') == 'semi_monthly' ? 'selected' : '' }}>Semi-Monthly</option>
+                                    <option value="monthly" {{ old('pay_schedule') == 'monthly' ? 'selected' : '' }}>Monthly</option>
                                 </select>
                                 @error('pay_schedule')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
-                                {{-- <p class="mt-1 text-xs text-gray-500">How often the employee gets paid</p> --}}
+                            </div>
+
+                            <div>
+                                <label for="pay_schedule_id" class="block text-sm font-medium text-gray-700">Pay Schedule <span class="text-red-500">*</span></label>
+                                <select name="pay_schedule_id" id="pay_schedule_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" disabled>
+                                    <option value="">First select pay frequency</option>
+                                </select>
+                                @error('pay_schedule_id')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                             
                             </div>
 
                             <!-- Empty div to maintain grid balance -->
@@ -1065,6 +1069,64 @@
                     employmentTypeSelect.dispatchEvent(new Event('change'));
                 }
             }
+        });
+
+        // Pay Schedule Dynamic Loading
+        document.addEventListener('DOMContentLoaded', function() {
+            const payFrequencySelect = document.getElementById('pay_schedule');
+            const payScheduleSelect = document.getElementById('pay_schedule_id');
+
+            payFrequencySelect.addEventListener('change', function() {
+                const selectedType = this.value;
+                
+                // Reset pay schedule dropdown
+                payScheduleSelect.innerHTML = '<option value="">Loading...</option>';
+                payScheduleSelect.disabled = true;
+
+                if (selectedType) {
+                    // Fetch pay schedules for selected type
+                    fetch(`{{ url('employees/pay-schedules') }}/${selectedType}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        credentials: 'same-origin'
+                    })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            payScheduleSelect.innerHTML = '<option value="">Select specific pay schedule</option>';
+                            
+                            if (data.length > 0) {
+                                data.forEach(schedule => {
+                                    const option = document.createElement('option');
+                                    option.value = schedule.id;
+                                    option.textContent = schedule.name;
+                                    if (schedule.is_default) {
+                                        option.textContent += ' (Default)';
+                                    }
+                                    payScheduleSelect.appendChild(option);
+                                });
+                                payScheduleSelect.disabled = false;
+                            } else {
+                                payScheduleSelect.innerHTML = '<option value="">No schedules available for this type</option>';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching pay schedules:', error);
+                            payScheduleSelect.innerHTML = `<option value="">Error loading schedules (${error.message})</option>`;
+                        });
+                } else {
+                    payScheduleSelect.innerHTML = '<option value="">First select pay frequency</option>';
+                    payScheduleSelect.disabled = true;
+                }
+            });
         });
     </script>
 

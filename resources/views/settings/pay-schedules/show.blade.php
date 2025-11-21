@@ -5,7 +5,7 @@
             <h1 class="text-2xl font-bold text-gray-900">Pay Schedule Details</h1>
             <div class="flex space-x-2">
                 <a href="{{ route('settings.pay-schedules.edit', $paySchedule) }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
-                    Edit Schedule
+                    dsa
                 </a>
                 <a href="{{ route('settings.pay-schedules.index') }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md">
                     Back to List

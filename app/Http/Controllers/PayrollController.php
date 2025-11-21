@@ -7,6 +7,7 @@ use App\Models\PayrollDetail;
 use App\Models\Employee;
 use App\Models\TimeLog;
 use App\Models\PayScheduleSetting;
+use App\Models\PaySchedule;
 use App\Models\CashAdvance;
 use App\Models\CashAdvancePayment;
 use App\Http\Controllers\TimeLogController;
@@ -1060,48 +1061,118 @@ class PayrollController extends Controller
     {
         $this->authorize('view payrolls');
 
-        // Get only active payroll schedule settings for selection
-        $scheduleSettings = \App\Models\PayScheduleSetting::systemDefaults()
-            ->active()
+        // Get all active pay schedules from pay_schedules table (NOT pay_schedule_settings)
+        $allSchedules = PaySchedule::active()
+            ->orderBy('type')
             ->orderBy('sort_order')
+            ->orderBy('name')
             ->get();
 
+
+
+        // Group schedules by type for display
+        $schedulesByType = $allSchedules->groupBy('type');
+
         // Calculate current periods and employee counts for each schedule
-        foreach ($scheduleSettings as $setting) {
-            // Get current period display
-            $currentPeriods = $this->getCurrentPeriodDisplayForSchedule($setting);
-            $setting->current_period_display = $currentPeriods;
-
-            // Calculate current pay period (not next)
-            $setting->next_period = $this->calculateCurrentPayPeriod($setting);
-
+        foreach ($allSchedules as $schedule) {
             // Count active employees for this schedule
-            $setting->active_employees_count = \App\Models\Employee::where('pay_schedule', $setting->code)
+            $schedule->active_employees_count = \App\Models\Employee::where('pay_schedule_id', $schedule->id)
                 ->where('employment_status', 'active')
                 ->count();
 
+            // Calculate current pay period for this schedule
+            try {
+                $schedule->next_period = $this->calculateCurrentPayPeriodForSchedule($schedule);
+            } catch (\Exception $e) {
+                $schedule->next_period = null;
+            }
+
             // Calculate and format last payroll period
             try {
-                $previousPeriod = $this->calculatePreviousPayPeriod($setting);
-                $startDate = \Carbon\Carbon::parse($previousPeriod['start']);
-                $endDate = \Carbon\Carbon::parse($previousPeriod['end']);
-
-                $setting->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('d, Y');
+                $previousPeriod = $this->calculatePreviousPayPeriodForSchedule($schedule);
+                if ($previousPeriod) {
+                    $startDate = \Carbon\Carbon::parse($previousPeriod['start']);
+                    $endDate = \Carbon\Carbon::parse($previousPeriod['end']);
+                    $schedule->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('d, Y');
+                }
             } catch (\Exception $e) {
                 // If calculation fails, fallback to checking actual last payroll
-                $lastPayroll = \App\Models\Payroll::where('pay_schedule', $setting->code)
+                $lastPayroll = \App\Models\Payroll::where('pay_schedule', $schedule->type)
                     ->orderBy('pay_date', 'desc')
                     ->first();
 
                 if ($lastPayroll) {
-                    $setting->last_payroll_period = \Carbon\Carbon::parse($lastPayroll->period_start)->format('M d') . ' - ' .
+                    $schedule->last_payroll_period = \Carbon\Carbon::parse($lastPayroll->period_start)->format('M d') . ' - ' .
                         \Carbon\Carbon::parse($lastPayroll->period_end)->format('d, Y');
                 }
             }
         }
 
         return view('payrolls.automation.index', [
-            'scheduleSettings' => $scheduleSettings
+            'schedulesByType' => $schedulesByType,
+            'allSchedules' => $allSchedules
+        ]);
+    }
+
+    /**
+     * Show pay schedules for a specific frequency type
+     */
+    public function automationSchedules(Request $request, $frequency)
+    {
+        $this->authorize('view payrolls');
+
+        // Validate frequency type
+        $validFrequencies = ['daily', 'weekly', 'semi_monthly', 'monthly'];
+        if (!in_array($frequency, $validFrequencies)) {
+            return redirect()->route('payrolls.automation.index')
+                ->with('error', 'Invalid pay frequency selected.');
+        }
+
+        // Get active pay schedules for this frequency
+        $schedules = PaySchedule::active()
+            ->where('type', $frequency)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        // Calculate employee counts and periods for each schedule
+        foreach ($schedules as $schedule) {
+            // Count active employees for this schedule
+            $schedule->active_employees_count = \App\Models\Employee::where('pay_schedule_id', $schedule->id)
+                ->where('employment_status', 'active')
+                ->count();
+
+            // Calculate current pay period for this schedule
+            try {
+                $schedule->next_period = $this->calculateCurrentPayPeriodForSchedule($schedule);
+            } catch (\Exception $e) {
+                $schedule->next_period = null;
+            }
+
+            // Calculate and format last payroll period
+            try {
+                $previousPeriod = $this->calculatePreviousPayPeriodForSchedule($schedule);
+                if ($previousPeriod) {
+                    $startDate = \Carbon\Carbon::parse($previousPeriod['start']);
+                    $endDate = \Carbon\Carbon::parse($previousPeriod['end']);
+                    $schedule->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('d, Y');
+                }
+            } catch (\Exception $e) {
+                // If calculation fails, fallback to checking actual last payroll
+                $lastPayroll = \App\Models\Payroll::where('pay_schedule', $schedule->type)
+                    ->orderBy('pay_date', 'desc')
+                    ->first();
+
+                if ($lastPayroll) {
+                    $schedule->last_payroll_period = \Carbon\Carbon::parse($lastPayroll->period_start)->format('M d') . ' - ' .
+                        \Carbon\Carbon::parse($lastPayroll->period_end)->format('d, Y');
+                }
+            }
+        }
+
+        return view('payrolls.automation.schedules', [
+            'schedules' => $schedules,
+            'frequency' => $frequency
         ]);
     }
     /**
@@ -1113,30 +1184,42 @@ class PayrollController extends Controller
 
         $this->authorize('create payrolls');
 
-        // Get the selected pay schedule
-        $scheduleCode = $request->input('schedule');
+        // Get the selected pay schedule (could be ID or legacy code)
+        $scheduleParam = $request->input('schedule');
 
-        Log::info('Schedule Code: ' . $scheduleCode);
+        Log::info('Schedule Parameter: ' . $scheduleParam);
 
-        if (!$scheduleCode) {
-            Log::warning('No schedule code provided');
+        if (!$scheduleParam) {
+            Log::warning('No schedule parameter provided');
             return redirect()->route('payrolls.automation.index')
                 ->with('error', 'Please select a pay schedule.');
         }
 
-        // Get schedule setting
-        $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-            ->where('code', $scheduleCode)
-            ->first();
+        // Try to find by ID first (new system), then by code (legacy)
+        $selectedSchedule = null;
+        if (is_numeric($scheduleParam)) {
+            // New system - PaySchedule model
+            $selectedSchedule = PaySchedule::active()->find($scheduleParam);
+            if ($selectedSchedule) {
+                // Redirect to new list route with schedule ID
+                return redirect()->route('payrolls.automation.list', ['schedule' => $selectedSchedule->id])
+                    ->with('success', 'Viewing automated payrolls for ' . $selectedSchedule->name . '.');
+            }
+        } else {
+            // Legacy system - PayScheduleSetting model
+            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $scheduleParam)
+                ->first();
 
-        if (!$selectedSchedule) {
-            return redirect()->route('payrolls.automation.index')
-                ->with('error', 'Invalid pay schedule selected.');
+            if ($selectedSchedule) {
+                // Redirect to legacy list route
+                return redirect()->route('payrolls.automation.list', $scheduleParam)
+                    ->with('success', 'Viewing draft payrolls for ' . $selectedSchedule->name . '. Click on individual employees to view details.');
+            }
         }
 
-        // Redirect directly to the draft automation list instead of creating payrolls
-        return redirect()->route('payrolls.automation.list', $scheduleCode)
-            ->with('success', 'Viewing draft payrolls for ' . $selectedSchedule->name . '. Click on individual employees to view details.');
+        return redirect()->route('payrolls.automation.index')
+            ->with('error', 'Invalid pay schedule selected.');
     }
 
     /**
@@ -1147,10 +1230,33 @@ class PayrollController extends Controller
     {
         $this->authorize('view payrolls');
 
-        // Get schedule setting
-        $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-            ->where('code', $schedule)
-            ->first();
+        // Handle both new PaySchedule IDs and legacy PayScheduleSetting codes
+        $selectedSchedule = null;
+        $scheduleCode = null;
+
+        if (is_numeric($schedule)) {
+            // New system - PaySchedule model
+            $paySchedule = PaySchedule::active()->find($schedule);
+            if ($paySchedule) {
+                // For new schedules, use the type as the code for payroll queries
+                $scheduleCode = $paySchedule->type;
+                $selectedSchedule = (object) [
+                    'code' => $paySchedule->type,
+                    'name' => $paySchedule->name,
+                    'type' => $paySchedule->type,
+                    'id' => $paySchedule->id
+                ];
+            }
+        } else {
+            // Legacy system - PayScheduleSetting model
+            $legacySchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+            if ($legacySchedule) {
+                $scheduleCode = $legacySchedule->code;
+                $selectedSchedule = $legacySchedule;
+            }
+        }
 
         if (!$selectedSchedule) {
             return redirect()->route('payrolls.automation.index')
@@ -1158,12 +1264,19 @@ class PayrollController extends Controller
         }
 
         // Calculate current period to filter payrolls
-        $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        if (isset($selectedSchedule->id) && is_numeric($schedule)) {
+            // New PaySchedule system - need to get the actual PaySchedule object
+            $payScheduleObj = PaySchedule::find($schedule);
+            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($payScheduleObj);
+        } else {
+            // Legacy PayScheduleSetting system
+            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        }
 
         // Check if payrolls exist for this period
         $existingPayrolls = Payroll::with(['creator', 'approver', 'payrollDetails.employee'])
             ->withCount('payrollDetails')
-            ->where('pay_schedule', $schedule)
+            ->where('pay_schedule', $scheduleCode)
             ->where('payroll_type', 'automated')
             ->where('period_start', $currentPeriod['start'])
             ->where('period_end', $currentPeriod['end'])
@@ -1177,7 +1290,7 @@ class PayrollController extends Controller
 
         // Always show draft mode for employees without payroll records
         // This will include dynamic draft payrolls for employees who don't have records yet
-        return $this->showDraftMode($selectedSchedule, $currentPeriod, $schedule);
+        return $this->showDraftMode($selectedSchedule, $currentPeriod, $scheduleCode);
     }
 
     /**
@@ -1200,10 +1313,18 @@ class PayrollController extends Controller
 
         // Get active employees for this schedule, excluding those who already have payrolls
         $employeesQuery = Employee::with(['user', 'department', 'position'])
-            ->where('pay_schedule', $schedule)
             ->where('employment_status', 'active')
             ->whereNotIn('id', $employeesWithPayrolls)
             ->orderBy('first_name');
+
+        // Handle both new PaySchedule system (by ID) and legacy system (by type)
+        if (isset($selectedSchedule->id) && is_numeric($selectedSchedule->id)) {
+            // New system - filter by pay_schedule_id
+            $employeesQuery->where('pay_schedule_id', $selectedSchedule->id);
+        } else {
+            // Legacy system - filter by pay_schedule type
+            $employeesQuery->where('pay_schedule', $schedule);
+        }
 
         // Get all employees count for calculations
         $allEmployees = $employeesQuery->get();
@@ -1211,9 +1332,14 @@ class PayrollController extends Controller
         if ($allEmployees->isEmpty()) {
             // If no employees are available for draft payrolls, show the page anyway
             // This could mean all employees already have payrolls or no active employees exist
-            $allActiveEmployees = Employee::where('pay_schedule', $schedule)
-                ->where('employment_status', 'active')
-                ->count();
+            $allActiveEmployeesQuery = Employee::where('employment_status', 'active');
+
+            // Handle both new PaySchedule system (by ID) and legacy system (by type)
+            if (isset($selectedSchedule->id) && is_numeric($selectedSchedule->id)) {
+                $allActiveEmployees = $allActiveEmployeesQuery->where('pay_schedule_id', $selectedSchedule->id)->count();
+            } else {
+                $allActiveEmployees = $allActiveEmployeesQuery->where('pay_schedule', $schedule)->count();
+            }
 
             // Don't redirect, show the page with appropriate message
 
@@ -5631,6 +5757,250 @@ class PayrollController extends Controller
         $periodStart = $currentDate->copy();
         $periodEnd = $currentDate->copy();
         $payDate = $currentDate->copy()->addDay();
+
+        return [
+            'start' => $periodStart->format('Y-m-d'),
+            'end' => $periodEnd->format('Y-m-d'),
+            'pay_date' => $payDate->format('Y-m-d'),
+        ];
+    }
+
+    /**
+     * Calculate the current pay period for a PaySchedule model (new multiple schedules)
+     */
+    private function calculateCurrentPayPeriodForSchedule($paySchedule)
+    {
+        $today = Carbon::now();
+
+        switch ($paySchedule->type) {
+            case 'weekly':
+                return $this->calculateCurrentWeeklyPayPeriodForSchedule($paySchedule, $today);
+            case 'semi_monthly':
+                return $this->calculateCurrentSemiMonthlyPayPeriodForSchedule($paySchedule, $today);
+            case 'monthly':
+                return $this->calculateCurrentMonthlyPayPeriodForSchedule($paySchedule, $today);
+            default:
+                throw new \Exception('Invalid schedule type: ' . $paySchedule->type);
+        }
+    }
+
+    /**
+     * Calculate the previous pay period for a PaySchedule model
+     */
+    private function calculatePreviousPayPeriodForSchedule($paySchedule)
+    {
+        $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        $currentStart = Carbon::parse($currentPeriod['start']);
+
+        switch ($paySchedule->type) {
+            case 'weekly':
+                $previousStart = $currentStart->copy()->subWeek();
+                return $this->calculateCurrentWeeklyPayPeriodForSchedule($paySchedule, $previousStart);
+
+            case 'semi_monthly':
+                // Find which cutoff period we're in and go to previous
+                $periods = $paySchedule->getValidatedCutoffPeriods();
+                if (count($periods) >= 2) {
+                    $firstPeriodStart = $periods[0]['start_day'];
+                    if ($currentStart->day == $firstPeriodStart) {
+                        // Current is first period, previous is second period of last month
+                        $previousDate = $currentStart->copy()->subMonth()->endOfMonth();
+                    } else {
+                        // Current is second period, previous is first period of same month
+                        $previousDate = $currentStart->copy()->startOfMonth();
+                    }
+                    return $this->calculateCurrentSemiMonthlyPayPeriodForSchedule($paySchedule, $previousDate);
+                }
+                break;
+
+            case 'monthly':
+                $previousDate = $currentStart->copy()->subMonth();
+                return $this->calculateCurrentMonthlyPayPeriodForSchedule($paySchedule, $previousDate);
+        }
+
+        return null;
+    }
+
+    /**
+     * Calculate current weekly pay period for PaySchedule
+     */
+    private function calculateCurrentWeeklyPayPeriodForSchedule($paySchedule, $currentDate)
+    {
+        $periods = $paySchedule->getValidatedCutoffPeriods();
+        if (empty($periods)) {
+            throw new \Exception('No cutoff periods configured for schedule: ' . $paySchedule->name);
+        }
+
+        $cutoff = $periods[0];
+        $startDayName = $cutoff['start_day'];
+        $endDayName = $cutoff['end_day'];
+        $payDayName = $cutoff['pay_day'];
+
+        $dayMap = [
+            'monday' => Carbon::MONDAY,
+            'tuesday' => Carbon::TUESDAY,
+            'wednesday' => Carbon::WEDNESDAY,
+            'thursday' => Carbon::THURSDAY,
+            'friday' => Carbon::FRIDAY,
+            'saturday' => Carbon::SATURDAY,
+            'sunday' => Carbon::SUNDAY
+        ];
+
+        $startDayNum = $dayMap[$startDayName];
+        $endDayNum = $dayMap[$endDayName];
+        $payDayNum = $dayMap[$payDayName];
+
+        // Find the current week's start and end based on configured days
+        $periodStart = $currentDate->copy()->startOfWeek($startDayNum);
+
+        if ($endDayNum >= $startDayNum) {
+            // Same week (e.g., Monday to Friday)
+            $periodEnd = $periodStart->copy()->startOfWeek($startDayNum)->addDays($endDayNum - $startDayNum);
+        } else {
+            // Crosses weeks (e.g., Saturday to Friday)
+            $periodEnd = $periodStart->copy()->startOfWeek($startDayNum)->addWeek()->addDays($endDayNum - 1);
+        }
+
+        // Calculate pay date
+        if ($payDayNum >= $startDayNum && $payDayNum <= $endDayNum) {
+            // Pay day is within the work week
+            $payDate = $periodStart->copy()->startOfWeek($startDayNum)->addDays($payDayNum - $startDayNum);
+        } else {
+            // Pay day is after the work week
+            $payDate = $periodEnd->copy()->addDays(1)->startOfWeek($payDayNum);
+        }
+
+        return [
+            'start' => $periodStart->format('Y-m-d'),
+            'end' => $periodEnd->format('Y-m-d'),
+            'pay_date' => $payDate->format('Y-m-d'),
+        ];
+    }
+
+    /**
+     * Calculate current semi-monthly pay period for PaySchedule
+     */
+    private function calculateCurrentSemiMonthlyPayPeriodForSchedule($paySchedule, $currentDate)
+    {
+        $periods = $paySchedule->getValidatedCutoffPeriods();
+        if (count($periods) < 2) {
+            throw new \Exception('Semi-monthly schedule must have 2 cutoff periods: ' . $paySchedule->name);
+        }
+
+        $currentDay = $currentDate->day;
+        $currentMonth = $currentDate->month;
+        $currentYear = $currentDate->year;
+
+        // Determine which period we're in
+        $firstPeriod = $periods[0];
+        $secondPeriod = $periods[1];
+
+        // Handle first period logic with proper month transitions
+        if ($this->isInSemiMonthlyPeriod($currentDate, $firstPeriod)) {
+            return $this->calculateSemiMonthlyPeriodForSchedule($currentYear, $currentMonth, $firstPeriod);
+        } else {
+            return $this->calculateSemiMonthlyPeriodForSchedule($currentYear, $currentMonth, $secondPeriod);
+        }
+    }
+
+    /**
+     * Check if current date is within a semi-monthly period, handling month overlaps
+     */
+    private function isInSemiMonthlyPeriod($currentDate, $period)
+    {
+        $startDay = $period['start_day'];
+        $endDay = $period['end_day'];
+        $currentDay = $currentDate->day;
+
+        // Case 1: Period within same month (e.g., 1-15)
+        if ($startDay <= $endDay) {
+            return $currentDay >= $startDay && $currentDay <= $endDay;
+        }
+
+        // Case 2: Period spans months (e.g., 21-5 next month)  
+        // We're in this period if:
+        // - Current day is >= start day (end of current month part)
+        // - OR current day is <= end day (beginning of next month part)
+        return $currentDay >= $startDay || $currentDay <= $endDay;
+    }
+
+    /**
+     * Calculate semi-monthly period dates with proper month handling for PaySchedule
+     */
+    private function calculateSemiMonthlyPeriodForSchedule($year, $month, $period)
+    {
+        $startDay = $period['start_day'];
+        $endDay = $period['end_day'];
+        $payDay = $period['pay_date'];
+
+        // Case 1: Period within same month (e.g., start=1, end=15, pay=16)
+        if ($startDay <= $endDay) {
+            $periodStart = Carbon::create($year, $month, $startDay);
+            $periodEnd = Carbon::create($year, $month, $endDay);
+
+            // Pay day logic: same month if pay <= days in month, otherwise next month
+            $daysInMonth = $periodEnd->daysInMonth;
+            if ($payDay <= $daysInMonth) {
+                $payDate = Carbon::create($year, $month, $payDay);
+            } else {
+                $payDate = Carbon::create($year, $month)->addMonth()->startOfMonth()->addDays($payDay - 1);
+            }
+        }
+        // Case 2: Period spans months (e.g., start=21, end=5, pay=10)
+        else {
+            $periodStart = Carbon::create($year, $month, $startDay);
+            $periodEnd = Carbon::create($year, $month)->addMonth()->startOfMonth()->addDays($endDay - 1);
+
+            // Pay day is in the end period's month (next month)
+            $payDate = Carbon::create($year, $month)->addMonth()->startOfMonth()->addDays($payDay - 1);
+        }
+
+        return [
+            'start' => $periodStart->format('Y-m-d'),
+            'end' => $periodEnd->format('Y-m-d'),
+            'pay_date' => $payDate->format('Y-m-d'),
+        ];
+    }
+
+    /**
+     * Calculate current monthly pay period for PaySchedule
+     */
+    private function calculateCurrentMonthlyPayPeriodForSchedule($paySchedule, $currentDate)
+    {
+        $periods = $paySchedule->getValidatedCutoffPeriods();
+        if (empty($periods)) {
+            throw new \Exception('No cutoff periods configured for schedule: ' . $paySchedule->name);
+        }
+
+        $cutoff = $periods[0];
+        $currentMonth = $currentDate->month;
+        $currentYear = $currentDate->year;
+
+        $startDay = $cutoff['start_day'];
+        $endDay = $cutoff['end_day'];
+        $payDay = $cutoff['pay_date'];
+
+        // Handle month transitions for monthly periods
+        if ($startDay <= $endDay) {
+            // Period within same month (e.g., 1-30)
+            $periodStart = Carbon::create($currentYear, $currentMonth, $startDay);
+            $periodEnd = Carbon::create($currentYear, $currentMonth, min($endDay, $currentDate->daysInMonth));
+
+            // Pay date logic
+            $daysInMonth = $periodEnd->daysInMonth;
+            if ($payDay <= $daysInMonth) {
+                $payDate = Carbon::create($currentYear, $currentMonth, $payDay);
+            } else {
+                $payDate = Carbon::create($currentYear, $currentMonth)->addMonth()->startOfMonth()->addDays($payDay - 1);
+            }
+        } else {
+            // Period spans months (e.g., 21 to 20 next month)
+            $periodStart = Carbon::create($currentYear, $currentMonth, $startDay);
+            $periodEnd = Carbon::create($currentYear, $currentMonth)->addMonth()->startOfMonth()->addDays($endDay - 1);
+
+            // Pay date is in the end period's month (next month)
+            $payDate = Carbon::create($currentYear, $currentMonth)->addMonth()->startOfMonth()->addDays($payDay - 1);
+        }
 
         return [
             'start' => $periodStart->format('Y-m-d'),

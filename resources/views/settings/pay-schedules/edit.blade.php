@@ -13,13 +13,46 @@
             @csrf
             @method('PUT')
 
-            <!-- Schedule Type Information -->
-            <div class="mb-6 p-4 bg-blue-50 rounded-lg">
-                <h3 class="text-lg font-medium text-blue-900 mb-2">{{ $paySchedule->name }} Schedule</h3>
-                <p class="text-sm text-blue-700">{{ $paySchedule->description }}</p>
+            <!-- Schedule Information -->
+            <div class="mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Schedule Name</label>
+                        <input type="text" name="name" id="name" required
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                               value="{{ old('name', $paySchedule->name) }}">
+                        @error('name')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Type</label>
+                        <div class="p-3 bg-gray-50 rounded-md">
+                            <span class="text-sm font-medium text-gray-900">
+                                {{ ucfirst(str_replace('_', ' ', $paySchedule->type)) }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label for="description" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <textarea name="description" id="description" rows="2"
+                              class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('description', $paySchedule->description) }}</textarea>
+                    @error('description')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
             </div>
 
-            @if($paySchedule->code === 'weekly')
+            <!-- Schedule Type Information -->
+            <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                <h3 class="text-lg font-medium text-blue-900 mb-2">Configure {{ ucfirst(str_replace('_', ' ', $paySchedule->type)) }} Schedule</h3>
+                <p class="text-sm text-blue-700">Set up the cutoff periods and pay dates for this schedule</p>
+            </div>
+
+            @if($paySchedule->type === 'weekly')
                 <!-- Weekly Schedule Configuration -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div>
@@ -81,7 +114,7 @@
                     </div>
                 </div>
 
-            @elseif($paySchedule->code === 'semi_monthly')
+            @elseif($paySchedule->type === 'semi_monthly')
                 <!-- Semi-Monthly Schedule Configuration -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
                     <!-- First Cutoff Period -->
@@ -155,7 +188,7 @@
                     </div>
                 </div>
 
-            @elseif($paySchedule->code === 'monthly')
+            @elseif($paySchedule->type === 'monthly')
                 <!-- Monthly Schedule Configuration -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div>
