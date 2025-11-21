@@ -1184,10 +1184,60 @@ class PayrollController extends Controller
             }
         }
 
+        // Add current period display text for each schedule
+        foreach ($schedules as $schedule) {
+            if (isset($schedule->next_period)) {
+                $schedule->current_period_display = $this->generateCurrentPeriodDisplay($schedule, $schedule->next_period);
+            }
+        }
+
         return view('payrolls.automation.schedules', [
             'schedules' => $schedules,
             'frequency' => $frequency
         ]);
+    }
+
+    /**
+     * Generate current period display text based on schedule type
+     */
+    private function generateCurrentPeriodDisplay($schedule, $periodData)
+    {
+        $startDate = \Carbon\Carbon::parse($periodData['start']);
+        $endDate = \Carbon\Carbon::parse($periodData['end']);
+        $today = \Carbon\Carbon::now();
+
+        switch ($schedule->type) {
+            case 'semi_monthly':
+                // Use the actual period number from the controller
+                $currentPeriod = $periodData['period_number'] ?? 1;
+                return ($currentPeriod == 1) ? 'Current: 1st Cut-off' : 'Current: 2nd Cut-off';
+
+            case 'monthly':
+                return 'Current: ' . $startDate->format('F');
+
+            case 'weekly':
+                // Calculate which week of the month this is
+                // Simple approach: divide the day of month by 7 and round up
+                $dayOfMonth = $startDate->day;
+                $weekNumber = (int) ceil($dayOfMonth / 7);
+
+                // Convert number to ordinal (1st, 2nd, 3rd, 4th)
+                $ordinal = match ($weekNumber) {
+                    1 => '1st',
+                    2 => '2nd',
+                    3 => '3rd',
+                    4 => '4th',
+                    default => $weekNumber . 'th'
+                };
+
+                return 'Current: ' . $ordinal . ' Week';
+
+            case 'daily':
+                return 'Current: ' . $today->format('l'); // Day name (Monday, Tuesday, etc.)
+
+            default:
+                return 'Current Period';
+        }
     }
 
     /**
@@ -1205,7 +1255,7 @@ class PayrollController extends Controller
         $selectedSchedule = null;
         if ($paySchedule) {
             $selectedSchedule = (object) [
-                'code' => $paySchedule->type,
+                'code' => $paySchedule->name,
                 'name' => $paySchedule->name,
                 'type' => $paySchedule->type,
                 'id' => $paySchedule->id
@@ -1358,7 +1408,7 @@ class PayrollController extends Controller
         $selectedSchedule = null;
         if ($paySchedule) {
             $selectedSchedule = (object) [
-                'code' => $paySchedule->type,
+                'code' => $paySchedule->name,
                 'name' => $paySchedule->name,
                 'type' => $paySchedule->type,
                 'id' => $paySchedule->id
@@ -1531,10 +1581,10 @@ class PayrollController extends Controller
             ->first();
 
         if ($paySchedule) {
-            // For new schedules, use the type as the code for payroll queries (maintains compatibility)
-            $scheduleCode = $paySchedule->type;
+            // For new schedules, use the name as the code for payroll queries (maintains URL consistency)
+            $scheduleCode = $paySchedule->name;
             $selectedSchedule = (object) [
-                'code' => $paySchedule->type,
+                'code' => $paySchedule->name,
                 'name' => $paySchedule->name,
                 'type' => $paySchedule->type,
                 'id' => $paySchedule->id,
@@ -1544,10 +1594,10 @@ class PayrollController extends Controller
             // Fallback: try by ID (new system)
             $paySchedule = PaySchedule::active()->find($schedule);
             if ($paySchedule) {
-                // For new schedules, use the type as the code for payroll queries (maintains compatibility)
-                $scheduleCode = $paySchedule->type;
+                // For new schedules, use the name as the code for payroll queries (maintains URL consistency)
+                $scheduleCode = $paySchedule->name;
                 $selectedSchedule = (object) [
-                    'code' => $paySchedule->type,
+                    'code' => $paySchedule->name,
                     'name' => $paySchedule->name,
                     'type' => $paySchedule->type,
                     'id' => $paySchedule->id,
@@ -9247,7 +9297,7 @@ class PayrollController extends Controller
         $selectedSchedule = null;
         if ($paySchedule) {
             $selectedSchedule = (object) [
-                'code' => $paySchedule->type,
+                'code' => $paySchedule->name,
                 'name' => $paySchedule->name,
                 'type' => $paySchedule->type,
                 'id' => $paySchedule->id
@@ -9598,6 +9648,7 @@ class PayrollController extends Controller
         $draftPayroll = new Payroll();
         $draftPayroll->id = $employee->id;
         $draftPayroll->payroll_number = 'DRAFT-' . $employee->employee_number;
+        $draftPayroll->pay_schedule = $schedule;  // Set the schedule name from URL (e.g., SEMI-2)
         $draftPayroll->period_start = $currentPeriod['start'];
         $draftPayroll->period_end = $currentPeriod['end'];
         $draftPayroll->pay_date = $currentPeriod['pay_date'];

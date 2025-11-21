@@ -422,8 +422,39 @@
                                 switch ($paySchedule) {
                                     case 'semi_monthly':
                                     case 'semi-monthly':
-                                        // Determine if it's 1st or 2nd cutoff based on the day
-                                        $cutoff = $periodStart->day <= 15 ? '1st' : '2nd';
+                                        // Determine cutoff based on actual schedule configuration
+                                        $cutoff = '1st'; // default
+                                        
+                                        // Try to get the actual schedule to determine correct cutoff
+                                        $actualSchedule = null;
+                                        if ($payroll->pay_schedule && $payroll->pay_schedule !== 'semi_monthly') {
+                                            // New system - find by schedule name (e.g., SEMI-1, SEMI-2)
+                                            $actualSchedule = \App\Models\PaySchedule::where('name', $payroll->pay_schedule)->first();
+                                            if ($actualSchedule && isset($actualSchedule->cutoff_periods) && count($actualSchedule->cutoff_periods) >= 2) {
+                                                // Check which period this payroll falls into
+                                                $periods = $actualSchedule->cutoff_periods;
+                                                $startDay = $periodStart->day;
+                                                $endDay = $periodEnd->day;
+                                                
+                                                // Check if this matches the first period configuration
+                                                $firstPeriodStart = is_numeric($periods[0]['start_day']) ? (int)$periods[0]['start_day'] : 1;
+                                                $firstPeriodEnd = is_numeric($periods[0]['end_day']) ? (int)$periods[0]['end_day'] : 15;
+                                                
+                                                // Check if this matches the second period configuration  
+                                                $secondPeriodStart = is_numeric($periods[1]['start_day']) ? (int)$periods[1]['start_day'] : 16;
+                                                
+                                                // Determine cutoff based on period start day matching configuration
+                                                if ($startDay >= $secondPeriodStart || ($startDay > $firstPeriodEnd)) {
+                                                    $cutoff = '2nd';
+                                                } else {
+                                                    $cutoff = '1st';
+                                                }
+                                            }
+                                        } else {
+                                            // Legacy system - use simple day check
+                                            $cutoff = $periodStart->day <= 15 ? '1st' : '2nd';
+                                        }
+                                        
                                         $payFrequencyDisplay = "Semi-Monthly - {$cutoff} Cutoff";
                                         break;
                                         

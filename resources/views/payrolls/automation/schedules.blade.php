@@ -88,13 +88,8 @@
                                             $startDate = \Carbon\Carbon::parse($schedule->next_period['start']);
                                             $endDate = \Carbon\Carbon::parse($schedule->next_period['end']);
                                             
-                                            // Determine period title for semi-monthly schedules
-                                            $periodTitle = 'Current Pay Period';
-                                            if ($schedule->type === 'semi_monthly') {
-                                                // Use the actual period number from the controller
-                                                $currentPeriod = $schedule->next_period['period_number'] ?? 1;
-                                                $periodTitle = ($currentPeriod == 1) ? 'Current: 1st Cut-off' : 'Current: 2nd Cut-off';
-                                            }
+                                            // Use the current period display text from controller
+                                            $periodTitle = $schedule->current_period_display ?? 'Current Pay Period';
                                         @endphp
                                         <div class="bg-gray-50 rounded-md p-3 mb-4 flex-grow">
                                             <h5 class="text-sm font-medium text-gray-900 mb-2">{{ $periodTitle }}</h5>
