@@ -88,9 +88,32 @@
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     @foreach($payrolls as $payroll)
+                                        @php
+                                            // Determine the correct route based on whether we're in a period-specific view
+                                            $payrollUrl = '';
+                                            if ($payroll->payrollDetails->count() == 1) {
+                                                if (isset($period) && $period !== 'current') {
+                                                    // Use period-specific route
+                                                    $payrollUrl = route('payrolls.automation.period.show', [
+                                                        'schedule' => $scheduleCode, 
+                                                        'period' => $period,
+                                                        'id' => $payroll->id
+                                                    ]);
+                                                } else {
+                                                    // Use regular route
+                                                    $payrollUrl = route('payrolls.automation.show', [
+                                                        'schedule' => $scheduleCode, 
+                                                        'id' => $payroll->payrollDetails->first()->employee_id
+                                                    ]);
+                                                }
+                                            } else {
+                                                // Multi-employee payroll, use general payroll route
+                                                $payrollUrl = route('payrolls.show', $payroll);
+                                            }
+                                        @endphp
                                         <tr class="hover:bg-gray-50 cursor-pointer transition-colors duration-150" 
                                            oncontextmenu="showContextMenu(event, '{{ $payroll->id }}', '{{ $payroll->payroll_number }}', '{{ \Carbon\Carbon::parse($payroll->period_start)->format('M d') }} - {{ \Carbon\Carbon::parse($payroll->period_end)->format('M d, Y') }}', '{{ $payroll->status }}', '{{ $scheduleCode }}', '{{ $payroll->payrollDetails->count() === 1 ? $payroll->payrollDetails->first()->employee_id : "" }}')"
-                                           onclick="window.open('{{ $payroll->payrollDetails->count() == 1 ? route('payrolls.automation.show', ['schedule' => $scheduleCode, 'id' => $payroll->payrollDetails->first()->employee_id]) : route('payrolls.show', $payroll) }}', '_blank')"
+                                           onclick="window.open('{{ $payrollUrl }}', '_blank')"
                                            title="Right-click for actions | Click to view in new tab">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm font-medium text-gray-900">{{ $payroll->payroll_number }}</div>

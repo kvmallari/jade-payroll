@@ -125,7 +125,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Automated Payroll - schedule selection and auto-creation for active employees
         Route::get('payrolls/automation', [PayrollController::class, 'automationIndex'])->name('payrolls.automation.index');
-        Route::get('payrolls/automation/schedules/{frequency}', [PayrollController::class, 'automationSchedules'])->name('payrolls.automation.schedules');
+        Route::get('payrolls/automation/{frequency}', [PayrollController::class, 'automationSchedules'])->name('payrolls.automation.schedules')->where('frequency', 'weekly|semi_monthly|monthly|daily');
+        Route::get('payrolls/automation/{schedule}/{period}', [PayrollController::class, 'automationPeriodList'])->name('payrolls.automation.period')->where(['schedule' => '[A-Za-z0-9_-]+', 'period' => '1st|2nd|current']);
+        Route::get('payrolls/automation/{schedule}/{period}/{id}', [PayrollController::class, 'showPeriodSpecificPayroll'])->name('payrolls.automation.period.show')->where(['schedule' => '[A-Za-z0-9_-]+', 'period' => '1st|2nd|current', 'id' => '[0-9]+']);
         Route::get('payrolls/automation/create', [PayrollController::class, 'automationCreate'])->name('payrolls.automation.create');
         Route::post('payrolls/automation/store', [PayrollController::class, 'automationStore'])->name('payrolls.automation.store');
         Route::get('payrolls/automation/{schedule}', [PayrollController::class, 'automationList'])->name('payrolls.automation.list')->where('schedule', '[A-Za-z0-9_-]+');
@@ -441,7 +443,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Employee Payslips
     Route::middleware('can:view own payslips')->group(function () {
-        Route::get('my-payslips', [PayrollController::class, 'myPayslips'])->name('payrolls.my-payslips');
+        Route::get('my-payslips', [PayrollController::class, 'm yPayslips'])->name('payrolls.my-payslips');
     });
 
     // Leave Requests

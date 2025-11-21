@@ -79,25 +79,16 @@
                                 <a href="{{ route('payrolls.automation.schedules', ['frequency' => $type]) }}" 
                                    class="block border-2 {{ $colors['border'] }} {{ $colors['hover_border'] }} {{ $colors['gradient'] }} rounded-xl {{ $colors['hover_bg'] }} hover:shadow-xl {{ $colors['shadow'] }} transition-all duration-300 cursor-pointer transform hover:scale-105 hover:-translate-y-1 h-80 min-h-80 max-h-80 w-full">
                                     <div class="py-6 px-8 h-full flex flex-col relative overflow-hidden">
-                                        <!-- Decorative background pattern -->
-                                        <div class="absolute top-0 right-0 w-32 h-32 opacity-10">
-                                            <svg class="w-full h-full" fill="currentColor" viewBox="0 0 100 100">
-                                                <circle cx="50" cy="50" r="40" class="
-                                                    {{ $type === 'weekly' ? 'text-green-500' : '' }}
-                                                    {{ $type === 'semi_monthly' ? 'text-blue-500' : '' }}
-                                                    {{ $type === 'monthly' ? 'text-purple-500' : '' }}"/>
-                                            </svg>
-                                        </div>
                                         
                                         <!-- Header with Type Badge -->
                                         <div class="flex items-center justify-between mb-4 relative z-10">
                                             <h4 class="text-lg font-semibold text-gray-900">{{ $frequencyLabels[$type] }}</h4>
-                                            <span class="px-3 py-1 text-xs font-medium rounded-full shadow-sm
+                                            {{-- <span class="px-3 py-1 text-xs font-medium rounded-full shadow-sm
                                                 {{ $type === 'weekly' ? 'bg-green-500 text-white' : '' }}
                                                 {{ $type === 'semi_monthly' ? 'bg-blue-500 text-white' : '' }}
                                                 {{ $type === 'monthly' ? 'bg-purple-500 text-white' : '' }}">
                                                 {{ ucfirst(str_replace('_', ' ', $type)) }}
-                                            </span>
+                                            </span> --}}
                                         </div>
 
                                         <!-- Statistics -->

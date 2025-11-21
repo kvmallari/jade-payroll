@@ -192,18 +192,18 @@ class PaySchedule extends Model
         // First cutoff
         if (isset($periods[0])) {
             $validated[] = [
-                'start_day' => $periods[0]['start_day'] ?? 1,
-                'end_day' => $periods[0]['end_day'] ?? 15,
-                'pay_date' => $periods[0]['pay_date'] ?? 16,
+                'start_day' => is_numeric($periods[0]['start_day'] ?? 1) ? (int)($periods[0]['start_day'] ?? 1) : ($periods[0]['start_day'] ?? 1),
+                'end_day' => is_numeric($periods[0]['end_day'] ?? 15) ? (int)($periods[0]['end_day'] ?? 15) : ($periods[0]['end_day'] ?? 15),
+                'pay_date' => is_numeric($periods[0]['pay_date'] ?? 16) ? (int)($periods[0]['pay_date'] ?? 16) : ($periods[0]['pay_date'] ?? 16),
             ];
         }
 
         // Second cutoff
         if (isset($periods[1])) {
             $validated[] = [
-                'start_day' => $periods[1]['start_day'] ?? 16,
-                'end_day' => $periods[1]['end_day'] ?? 31,
-                'pay_date' => $periods[1]['pay_date'] ?? 5, // 5th of next month
+                'start_day' => is_numeric($periods[1]['start_day'] ?? 16) ? (int)($periods[1]['start_day'] ?? 16) : ($periods[1]['start_day'] ?? 16),
+                'end_day' => is_numeric($periods[1]['end_day'] ?? 'EOD') ? (int)($periods[1]['end_day'] ?? 'EOD') : ($periods[1]['end_day'] ?? 'EOD'), // Support EOD for end of month
+                'pay_date' => is_numeric($periods[1]['pay_date'] ?? 5) ? (int)($periods[1]['pay_date'] ?? 5) : ($periods[1]['pay_date'] ?? 5),
             ];
         }
 
@@ -220,9 +220,9 @@ class PaySchedule extends Model
         $period = $periods[0];
         return [
             [
-                'start_day' => $period['start_day'] ?? 1,
-                'end_day' => $period['end_day'] ?? 31,
-                'pay_date' => $period['pay_date'] ?? 31,
+                'start_day' => is_numeric($period['start_day'] ?? 1) ? (int)($period['start_day'] ?? 1) : ($period['start_day'] ?? 1),
+                'end_day' => $period['end_day'] ?? 'EOD', // Support EOD for end of month
+                'pay_date' => $period['pay_date'] ?? 'EOD', // Support EOD for pay date
             ]
         ];
     }

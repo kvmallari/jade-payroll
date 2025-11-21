@@ -1155,17 +1155,31 @@ class PayrollController extends Controller
                 if ($previousPeriod) {
                     $startDate = \Carbon\Carbon::parse($previousPeriod['start']);
                     $endDate = \Carbon\Carbon::parse($previousPeriod['end']);
-                    $schedule->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('d, Y');
+
+                    // Format with proper cross-month handling
+                    if ($startDate->month === $endDate->month) {
+                        $schedule->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('d, Y');
+                    } else {
+                        $schedule->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('M d, Y');
+                    }
                 }
             } catch (\Exception $e) {
-                // If calculation fails, fallback to checking actual last payroll
+                // If calculation fails, fallback to checking actual last payroll from database
                 $lastPayroll = \App\Models\Payroll::where('pay_schedule', $schedule->type)
-                    ->orderBy('pay_date', 'desc')
+                    ->where('payroll_type', 'automated')
+                    ->orderBy('period_end', 'desc')
+                    ->orderBy('created_at', 'desc')
                     ->first();
 
                 if ($lastPayroll) {
-                    $schedule->last_payroll_period = \Carbon\Carbon::parse($lastPayroll->period_start)->format('M d') . ' - ' .
-                        \Carbon\Carbon::parse($lastPayroll->period_end)->format('d, Y');
+                    $startDate = \Carbon\Carbon::parse($lastPayroll->period_start);
+                    $endDate = \Carbon\Carbon::parse($lastPayroll->period_end);
+
+                    if ($startDate->month === $endDate->month) {
+                        $schedule->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('d, Y');
+                    } else {
+                        $schedule->last_payroll_period = $startDate->format('M d') . ' - ' . $endDate->format('M d, Y');
+                    }
                 }
             }
         }
@@ -1175,6 +1189,283 @@ class PayrollController extends Controller
             'frequency' => $frequency
         ]);
     }
+
+    /**
+     * Automation Payroll - List payrolls for specific schedule and period
+     */
+    public function automationPeriodList(Request $request, $schedule, $period)
+    {
+        $this->authorize('view payrolls');
+
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
+            ->first();
+
+        $selectedSchedule = null;
+        if ($paySchedule) {
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->type,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id
+            ];
+        } else {
+            // Legacy system fallback
+            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+        }
+
+        if (!$selectedSchedule) {
+            return redirect()->route('payrolls.automation.index')
+                ->with('error', 'Invalid pay schedule selected.');
+        }
+
+        // Calculate the specific period based on the period parameter
+        $targetPeriod = null;
+        if ($paySchedule) {
+            $targetPeriod = $this->calculateSpecificPayPeriod($paySchedule, $period);
+        } else {
+            // For legacy schedules, fall back to current period
+            $targetPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        }
+
+        if (!$targetPeriod) {
+            return redirect()->route('payrolls.automation.index')
+                ->with('error', 'Unable to calculate pay period.');
+        }
+
+        // Check if payrolls exist for this specific period
+        $existingPayrolls = Payroll::with(['creator', 'approver', 'payrollDetails.employee'])
+            ->withCount('payrollDetails')
+            ->where('pay_schedule', $selectedSchedule->code)
+            ->where('payroll_type', 'automated')
+            ->where('period_start', $targetPeriod['start'])
+            ->where('period_end', $targetPeriod['end'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(request('per_page', 15));
+
+        return view('payrolls.automation.list', [
+            'selectedSchedule' => $selectedSchedule,
+            'currentPeriod' => $targetPeriod,
+            'payrolls' => $existingPayrolls,
+            'scheduleCode' => $selectedSchedule->code,
+            'hasPayrolls' => $existingPayrolls->count() > 0,
+            'isDraft' => false,
+            'period' => $period,
+            'allApproved' => $existingPayrolls->every(function ($payroll) {
+                return $payroll->status === 'approved';
+            }),
+            'backUrl' => route('payrolls.automation.schedules', ['frequency' => $selectedSchedule->code])
+        ]);
+    }
+
+    /**
+     * Calculate specific pay period based on period parameter (1st, 2nd, current)
+     */
+    private function calculateSpecificPayPeriod($paySchedule, $period)
+    {
+        $today = Carbon::now();
+
+        switch ($period) {
+            case 'current':
+                return $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+
+            case '1st':
+                if ($paySchedule->type === 'semi_monthly') {
+                    // Calculate 1st period of current month
+                    $periods = $paySchedule->getValidatedCutoffPeriods();
+                    if (count($periods) >= 1) {
+                        return $this->calculateSemiMonthlyPeriodForSchedule($today->year, $today->month, $periods[0]);
+                    }
+                }
+                break;
+
+            case '2nd':
+                if ($paySchedule->type === 'semi_monthly') {
+                    // Calculate 2nd period of current month
+                    $periods = $paySchedule->getValidatedCutoffPeriods();
+                    if (count($periods) >= 2) {
+                        return $this->calculateSemiMonthlyPeriodForSchedule($today->year, $today->month, $periods[1]);
+                    }
+                }
+                break;
+        }
+
+        // Fallback to current period
+        return $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+    }
+
+    /**
+     * Show draft mode for specific period
+     */
+    private function showDraftModeForPeriod($selectedSchedule, $targetPeriod, $schedule, $period)
+    {
+        // Get employees who already have payroll records for this period
+        $employeesWithPayrolls = Payroll::whereHas('payrollDetails')
+            ->where('pay_schedule', $schedule)
+            ->where('period_start', $targetPeriod['start'])
+            ->where('period_end', $targetPeriod['end'])
+            ->where('payroll_type', 'automated')
+            ->with('payrollDetails')
+            ->get()
+            ->pluck('payrollDetails.*.employee_id')
+            ->flatten()
+            ->unique()
+            ->toArray();
+
+        // Get active employees for this schedule, excluding those who already have payrolls
+        $employeesQuery = Employee::with(['user', 'department', 'position'])
+            ->where('employment_status', 'active')
+            ->whereNotIn('id', $employeesWithPayrolls);
+
+        // Filter by pay schedule
+        if (isset($selectedSchedule->id)) {
+            // New PaySchedule system
+            $employeesQuery->where('pay_schedule_id', $selectedSchedule->id);
+        } else {
+            // Legacy system - filter by pay_schedule field
+            $employeesQuery->where('pay_schedule', $schedule);
+        }
+
+        $employees = $employeesQuery->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        return view('payrolls.automation.list', [
+            'selectedSchedule' => $selectedSchedule,
+            'currentPeriod' => $targetPeriod,
+            'employees' => $employees,
+            'existingPayrolls' => collect([]), // Empty for draft mode
+            'isDraftMode' => true,
+            'period' => $period ?? 'current'
+        ]);
+    }
+
+    /**
+     * Show individual payroll with period-specific context
+     */
+    public function showPeriodSpecificPayroll(Request $request, $schedule, $period, $id)
+    {
+        $this->authorize('view payrolls');
+
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
+            ->first();
+
+        $selectedSchedule = null;
+        if ($paySchedule) {
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->type,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id
+            ];
+        } else {
+            // Legacy system fallback
+            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+        }
+
+        if (!$selectedSchedule) {
+            return redirect()->route('payrolls.automation.index')
+                ->with('error', 'Invalid pay schedule selected.');
+        }
+
+        // Calculate the specific period based on the period parameter
+        $targetPeriod = null;
+        if ($paySchedule) {
+            $targetPeriod = $this->calculateSpecificPayPeriod($paySchedule, $period);
+        } else {
+            // For legacy schedules, fall back to current period
+            $targetPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+        }
+
+        if (!$targetPeriod) {
+            return redirect()->route('payrolls.automation.period', ['schedule' => $schedule, 'period' => $period])
+                ->with('error', 'Unable to calculate pay period.');
+        }
+
+        // First, check if this ID is a payroll ID (for saved/historical payrolls)
+        $payroll = Payroll::with(['payrollDetails.employee', 'creator', 'approver'])
+            ->where('id', $id)
+            ->where('pay_schedule', $selectedSchedule->code)
+            ->where('period_start', $targetPeriod['start'])
+            ->where('period_end', $targetPeriod['end'])
+            ->first();
+
+        if ($payroll) {
+            // This is a saved payroll - show it with the correct period context
+            return $this->showPayrollWithPeriodContext($payroll, $schedule, $period, $targetPeriod);
+        }
+
+        // If not a payroll ID, treat it as an employee ID (for current period/draft payrolls)
+        $employee = Employee::with(['timeSchedule', 'daySchedule'])->find($id);
+
+        if (!$employee) {
+            return redirect()->route('payrolls.automation.period', ['schedule' => $schedule, 'period' => $period])
+                ->with('error', 'Employee or payroll not found.');
+        }
+
+        // Check if employee has payroll for this specific period
+        $existingPayroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
+            $query->where('employee_id', $employee->id);
+        })
+            ->where('pay_schedule', $selectedSchedule->code)
+            ->where('period_start', $targetPeriod['start'])
+            ->where('period_end', $targetPeriod['end'])
+            ->where('payroll_type', 'automated')
+            ->first();
+
+        if ($existingPayroll) {
+            // Redirect to the payroll ID version to maintain consistency
+            return redirect()->route('payrolls.automation.period.show', [
+                'schedule' => $schedule,
+                'period' => $period,
+                'id' => $existingPayroll->id
+            ]);
+        }
+
+        // No existing payroll - show draft mode for this specific period
+        return $this->showDraftModeForSpecificPeriod($selectedSchedule, $employee, $targetPeriod, $schedule, $period);
+    }
+
+    /**
+     * Show payroll with period context
+     */
+    private function showPayrollWithPeriodContext($payroll, $schedule, $period, $targetPeriod)
+    {
+        // Override the payroll period data with the target period to ensure consistency
+        $payroll->calculated_period = $targetPeriod;
+        $payroll->context_period = $period;
+        $payroll->context_schedule = $schedule;
+
+        // Override the period dates to match the target period
+        $payroll->override_period_start = $targetPeriod['start'];
+        $payroll->override_period_end = $targetPeriod['end'];
+        $payroll->override_pay_date = $targetPeriod['pay_date'];
+
+        return $this->showPayrollWithAdditionalData($payroll, [
+            'schedule' => $schedule,
+            'period' => $period,
+            'targetPeriod' => $targetPeriod,
+            'backUrl' => route('payrolls.automation.period', ['schedule' => $schedule, 'period' => $period])
+        ]);
+    }
+    /**
+     * Show draft mode for specific employee and period
+     */
+    private function showDraftModeForSpecificPeriod($selectedSchedule, $employee, $targetPeriod, $schedule, $period)
+    {
+        // This would show the employee's draft payroll for the specific period
+        // For now, redirect back to the period list with a message
+        return redirect()->route('payrolls.automation.period', ['schedule' => $schedule, 'period' => $period])
+            ->with('info', 'No payroll found for this employee in the selected period.');
+    }
+
     /**
      * Automation Payroll - Create payroll for selected schedule
      */
@@ -1246,7 +1537,8 @@ class PayrollController extends Controller
                 'code' => $paySchedule->type,
                 'name' => $paySchedule->name,
                 'type' => $paySchedule->type,
-                'id' => $paySchedule->id
+                'id' => $paySchedule->id,
+                'route_name' => $paySchedule->name  // Use name for routes
             ];
         } else if (is_numeric($schedule)) {
             // Fallback: try by ID (new system)
@@ -1258,7 +1550,8 @@ class PayrollController extends Controller
                     'code' => $paySchedule->type,
                     'name' => $paySchedule->name,
                     'type' => $paySchedule->type,
-                    'id' => $paySchedule->id
+                    'id' => $paySchedule->id,
+                    'route_name' => $paySchedule->name  // Use name for routes
                 ];
             }
         } else {
@@ -1303,13 +1596,14 @@ class PayrollController extends Controller
 
         // Always show draft mode for employees without payroll records
         // This will include dynamic draft payrolls for employees who don't have records yet
-        return $this->showDraftMode($selectedSchedule, $currentPeriod, $scheduleCode);
+        $routeName = isset($selectedSchedule->route_name) ? $selectedSchedule->route_name : $scheduleCode;
+        return $this->showDraftMode($selectedSchedule, $currentPeriod, $scheduleCode, $routeName);
     }
 
     /**
      * Show draft mode with dynamic calculations (not saved to DB)
      */
-    private function showDraftMode($selectedSchedule, $currentPeriod, $schedule)
+    private function showDraftMode($selectedSchedule, $currentPeriod, $schedule, $routeName = null)
     {
         // Get employees who already have payroll records for this period
         $employeesWithPayrolls = Payroll::whereHas('payrollDetails')
@@ -1369,7 +1663,7 @@ class PayrollController extends Controller
                 'selectedSchedule',
                 'currentPeriod'
             ) + [
-                'scheduleCode' => $schedule,
+                'scheduleCode' => $routeName ?: $schedule,
                 'isDraft' => true,
                 'payrolls' => $mockPaginator,
                 'hasPayrolls' => false,
@@ -1457,7 +1751,7 @@ class PayrollController extends Controller
             'selectedSchedule',
             'currentPeriod'
         ) + [
-            'scheduleCode' => $schedule,
+            'scheduleCode' => $routeName ?: $schedule,
             'isDraft' => true,
             'payrolls' => $mockPaginator,
             'hasPayrolls' => false,
@@ -5811,18 +6105,38 @@ class PayrollController extends Controller
                 return $this->calculateCurrentWeeklyPayPeriodForSchedule($paySchedule, $previousStart);
 
             case 'semi_monthly':
-                // Find which cutoff period we're in and go to previous
+                // Find which cutoff period we're in and calculate previous using pay date logic
                 $periods = $paySchedule->getValidatedCutoffPeriods();
                 if (count($periods) >= 2) {
-                    $firstPeriodStart = $periods[0]['start_day'];
-                    if ($currentStart->day == $firstPeriodStart) {
-                        // Current is first period, previous is second period of last month
-                        $previousDate = $currentStart->copy()->subMonth()->endOfMonth();
+                    $today = Carbon::now();
+                    $firstPeriod = $periods[0];
+                    $secondPeriod = $periods[1];
+
+                    // Use the same pay date cutoff logic as current period detection
+                    $currentPeriodNum = $this->getCurrentPeriodByPayDateCutoff($today, $periods);
+
+                    if ($currentPeriodNum == 1) {
+                        // Current is 1st period, previous is 2nd period of previous cycle
+                        $prevPeriod = $secondPeriod;
+                        $previousDate = $today->copy()->subMonth();
                     } else {
-                        // Current is second period, previous is first period of same month
-                        $previousDate = $currentStart->copy()->startOfMonth();
+                        // Current is 2nd period, previous is 1st period of current cycle
+                        $prevPeriod = $firstPeriod;
+
+                        // For 1st period, check if it's a cross-month period
+                        $startDay = (int)$prevPeriod['start_day'];
+                        $endDay = (int)$prevPeriod['end_day'];
+
+                        if ($startDay > $endDay) {
+                            // Cross-month period - starts in previous month
+                            $previousDate = $today->copy()->subMonth();
+                        } else {
+                            // Same-month period - use current month
+                            $previousDate = $today->copy();
+                        }
                     }
-                    return $this->calculateCurrentSemiMonthlyPayPeriodForSchedule($paySchedule, $previousDate);
+
+                    return $this->calculateSemiMonthlyPeriodForSchedule($previousDate->year, $previousDate->month, $prevPeriod);
                 }
                 break;
 
@@ -5904,23 +6218,86 @@ class PayrollController extends Controller
         $currentMonth = $currentDate->month;
         $currentYear = $currentDate->year;
 
-        // Determine which period we're in
+        // Determine which period we're in based on pay date cutoffs
         $firstPeriod = $periods[0];
         $secondPeriod = $periods[1];
 
-        // Handle first period logic with proper month transitions
-        if ($this->isInSemiMonthlyPeriod($currentDate, $firstPeriod)) {
-            return $this->calculateSemiMonthlyPeriodForSchedule($currentYear, $currentMonth, $firstPeriod);
+        // NEW LOGIC: Use pay date cutoffs to determine current period
+        $currentPeriodNumber = $this->getCurrentPeriodByPayDateCutoff($currentDate, $periods);
+
+        if ($currentPeriodNumber === 1) {
+            $period = $firstPeriod;
+            $contextMonth = $this->determineCorrectMonthContext($currentDate, $period);
+            $periodData = $this->calculateSemiMonthlyPeriodForSchedule($contextMonth['year'], $contextMonth['month'], $period);
+            $periodData['period_number'] = 1;
+            return $periodData;
         } else {
-            return $this->calculateSemiMonthlyPeriodForSchedule($currentYear, $currentMonth, $secondPeriod);
+            $period = $secondPeriod;
+            $contextMonth = $this->determineCorrectMonthContext($currentDate, $period);
+            $periodData = $this->calculateSemiMonthlyPeriodForSchedule($contextMonth['year'], $contextMonth['month'], $period);
+            $periodData['period_number'] = 2;
+            return $periodData;
         }
     }
 
     /**
-     * Check if current date is within a semi-monthly period, handling month overlaps
+     * Determine the correct month context for cross-month periods
+     * Simple rule: if we're before/on the pay date, and pay date comes after period end,
+     * then the period spans from previous month
+     */
+    private function determineCorrectMonthContext($currentDate, $period)
+    {
+        $startDay = (int)$period['start_day'];
+        $endDay = (int)$period['end_day'];
+        $payDay = (int)$period['pay_date'];
+        $currentDay = $currentDate->day;
+
+        if ($startDay <= $endDay) {
+            // Same-month period - use current month
+            return ['year' => $currentDate->year, 'month' => $currentDate->month];
+        } else {
+            // Cross-month period (start_day > end_day)
+            // The key insight: pay date position tells us about the period instance
+
+            if ($payDay > $endDay) {
+                // Pay date is after the period end day (e.g., period 21-5, pay 10)
+                // This means pay happens AFTER crossing to next month
+                // If we're currently <= pay day, we're in the "previous month started" instance
+                if ($currentDay <= $payDay) {
+                    $previous = $currentDate->copy()->subMonth();
+                    return ['year' => $previous->year, 'month' => $previous->month];
+                } else {
+                    // After pay day, so we're in current month's instance
+                    return ['year' => $currentDate->year, 'month' => $currentDate->month];
+                }
+            } else {
+                // Pay date is within the period end portion (e.g., period 26-10, pay 15 -> pay comes after end)
+                // Wait, this case doesn't make sense. Pay date should be after period end for this logic.
+                // Let's use the simple rule: if current <= end, use previous month
+                if ($currentDay <= $endDay) {
+                    $previous = $currentDate->copy()->subMonth();
+                    return ['year' => $previous->year, 'month' => $previous->month];
+                } else {
+                    return ['year' => $currentDate->year, 'month' => $currentDate->month];
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if current date is within a semi-monthly period based on pay date cutoffs
+     * NEW LOGIC: Period is determined by pay dates, not start/end days
      */
     private function isInSemiMonthlyPeriod($currentDate, $period)
     {
+        // Get all periods to compare pay dates
+        $paySchedule = null;
+        $allPeriods = [];
+
+        // We need access to all periods to determine cutoff logic
+        // This is a bit of a hack, but we'll improve this approach
+
+        // For now, let's use the old logic as fallback
         $startDay = $period['start_day'];
         $endDay = $period['end_day'];
         $currentDay = $currentDate->day;
@@ -5938,7 +6315,92 @@ class PayrollController extends Controller
     }
 
     /**
+     * NEW METHOD: Determine current period based on pay date cutoffs only
+     * Simple logic: current period determined by which pay date we haven't reached yet
+     */
+    private function getCurrentPeriodByPayDateCutoff($currentDate, $periods)
+    {
+        $currentDay = $currentDate->day;
+        $firstPeriod = $periods[0];
+        $secondPeriod = $periods[1];
+
+        // Handle EOD values
+        $firstPayDay = ($firstPeriod['pay_date'] === 'EOD' || $firstPeriod['pay_date'] === 'eod')
+            ? $currentDate->daysInMonth : (int)$firstPeriod['pay_date'];
+        $secondPayDay = ($secondPeriod['pay_date'] === 'EOD' || $secondPeriod['pay_date'] === 'eod')
+            ? $currentDate->daysInMonth : (int)$secondPeriod['pay_date'];
+
+        // Corrected pay date cutoff logic:
+        // You are IN a period until its pay date (inclusive), then move to next period
+        // Example: SEMI-2 has pay dates 10th and 25th
+        // - Days 1-10: Period 1 (earning towards 10th pay, including pay day)
+        // - Days 11-25: Period 2 (earning towards 25th pay, including pay day)  
+        // - Days 26+: Period 1 (new cycle starts)
+
+        if ($firstPayDay <= $secondPayDay) {
+            // Normal case: first pay comes before second (e.g., 10th then 25th)
+            if ($currentDay <= $firstPayDay) {
+                return 1; // Up to and including first pay date - in 1st period
+            } elseif ($currentDay <= $secondPayDay) {
+                return 2; // Up to and including second pay date - in 2nd period  
+            } else {
+                return 1; // After second pay - new cycle, in 1st period
+            }
+        } else {
+            // Cross-month case: first pay comes after second (e.g., 25th then 10th next month)
+            if ($currentDay <= $secondPayDay) {
+                return 1; // Up to and including second pay date - in 1st period
+            } elseif ($currentDay <= $firstPayDay) {
+                return 2; // Up to and including first pay date - in 2nd period
+            } else {
+                return 1; // After first pay - new cycle, in 1st period
+            }
+        }
+    }
+
+    /**
+     * Helper method to check if current date falls within a period's date range
+     * Enhanced to support EOD for start_day, end_day, and proper month context
+     */
+    private function isInPeriodDateRange($currentDate, $period)
+    {
+        $startDay = $period['start_day'];
+        $endDay = $period['end_day'];
+        $currentDay = $currentDate->day;
+
+        // Handle EOD (End of Day) values with proper month context
+        if ($startDay === 'EOD' || $startDay === 'eod') {
+            // For start_day EOD, use last day of current month
+            $startDay = $currentDate->daysInMonth;
+        } else {
+            $startDay = (int)$startDay;
+        }
+
+        if ($endDay === 'EOD' || $endDay === 'eod') {
+            // For end_day EOD, determine the appropriate month based on period logic
+            if ($startDay <= $currentDate->daysInMonth) {
+                // Period likely within same month, use current month's last day
+                $endDay = $currentDate->daysInMonth;
+            } else {
+                // Period might span to next month, use next month's last day context
+                $endDay = $currentDate->copy()->addMonth()->daysInMonth;
+            }
+        } else {
+            $endDay = (int)$endDay;
+        }
+
+        // Case 1: Period within same month (e.g., 1-15 or 1-EOD)
+        if ($startDay <= $endDay) {
+            return $currentDay >= $startDay && $currentDay <= $endDay;
+        }
+
+        // Case 2: Period spans months (e.g., 21-5 next month or EOD-15)
+        return $currentDay >= $startDay || $currentDay <= $endDay;
+    }
+
+    /**
      * Calculate semi-monthly period dates with proper month handling for PaySchedule
+     * Enhanced EOD support for start_day, end_day, and pay_date with intelligent month detection
      */
     private function calculateSemiMonthlyPeriodForSchedule($year, $month, $period)
     {
@@ -5946,26 +6408,58 @@ class PayrollController extends Controller
         $endDay = $period['end_day'];
         $payDay = $period['pay_date'];
 
-        // Case 1: Period within same month (e.g., start=1, end=15, pay=16)
+        $baseDate = Carbon::create($year, $month, 1);
+
+        // Enhanced EOD (End of Day) handling with proper month context
+        if ($startDay === 'EOD' || $startDay === 'eod') {
+            // For start_day EOD, use last day of the base month
+            $startDay = (int) $baseDate->daysInMonth;
+        } else {
+            $startDay = (int) $startDay;
+        }
+
+        if ($endDay === 'EOD' || $endDay === 'eod') {
+            // For end_day EOD, determine appropriate month based on period flow
+            if ($startDay <= $baseDate->daysInMonth) {
+                // Period starts within current month, end EOD is current month's last day
+                $endDay = (int) $baseDate->daysInMonth;
+            } else {
+                // Period spans months, end EOD is next month's last day
+                $endDay = (int) $baseDate->copy()->addMonth()->daysInMonth;
+            }
+        } else {
+            $endDay = (int) $endDay;
+        }
+
+        if ($payDay === 'EOD' || $payDay === 'eod') {
+            // For pay_date EOD, determine appropriate month based on period end
+            if ($startDay <= $endDay) {
+                // Period within same month, pay EOD is current month's last day
+                $payDay = (int) $baseDate->daysInMonth;
+            } else {
+                // Period spans months, pay EOD could be next month's last day
+                $payDay = (int) $baseDate->copy()->addMonth()->daysInMonth;
+            }
+        } else {
+            $payDay = (int) $payDay;
+        }
+
+        // Case 1: Period within same month (start <= end, e.g., 1 <= 15)
         if ($startDay <= $endDay) {
             $periodStart = Carbon::create($year, $month, $startDay);
             $periodEnd = Carbon::create($year, $month, $endDay);
 
-            // Pay day logic: same month if pay <= days in month, otherwise next month
-            $daysInMonth = $periodEnd->daysInMonth;
-            if ($payDay <= $daysInMonth) {
-                $payDate = Carbon::create($year, $month, $payDay);
-            } else {
-                $payDate = Carbon::create($year, $month)->addMonth()->startOfMonth()->addDays($payDay - 1);
-            }
+            // For same-month periods, pay date is in the same month
+            $payDate = Carbon::create($year, $month, $payDay);
         }
-        // Case 2: Period spans months (e.g., start=21, end=5, pay=10)
+        // Case 2: Period spans months (start > end, e.g., 21 > 5)
         else {
             $periodStart = Carbon::create($year, $month, $startDay);
-            $periodEnd = Carbon::create($year, $month)->addMonth()->startOfMonth()->addDays($endDay - 1);
+            $periodEnd = Carbon::create($year, $month)->addMonth()->day($endDay);
 
-            // Pay day is in the end period's month (next month)
-            $payDate = Carbon::create($year, $month)->addMonth()->startOfMonth()->addDays($payDay - 1);
+            // For cross-month periods, pay date is in the same month as the end date
+            // The end date is in the next month, so pay date should also be in the next month
+            $payDate = Carbon::create($year, $month)->addMonth()->day($payDay);
         }
 
         return [
@@ -5993,26 +6487,46 @@ class PayrollController extends Controller
         $endDay = $cutoff['end_day'];
         $payDay = $cutoff['pay_date'];
 
+        // Handle EOD (End of Day) values - convert to actual last day of month
+        if ($endDay === 'EOD' || $endDay === 'eod') {
+            $endDay = (int) Carbon::create($currentYear, $currentMonth)->daysInMonth;
+        }
+        if ($payDay === 'EOD' || $payDay === 'eod') {
+            $payDay = (int) Carbon::create($currentYear, $currentMonth)->daysInMonth;
+        }
+
+        // Ensure all day values are integers
+        $startDay = (int) $startDay;
+        $endDay = (int) $endDay;
+        $payDay = (int) $payDay;
+
         // Handle month transitions for monthly periods
         if ($startDay <= $endDay) {
             // Period within same month (e.g., 1-30)
             $periodStart = Carbon::create($currentYear, $currentMonth, $startDay);
-            $periodEnd = Carbon::create($currentYear, $currentMonth, min($endDay, $currentDate->daysInMonth));
+            $periodEnd = Carbon::create($currentYear, $currentMonth, $endDay);
 
-            // Pay date logic
-            $daysInMonth = $periodEnd->daysInMonth;
-            if ($payDay <= $daysInMonth) {
-                $payDate = Carbon::create($currentYear, $currentMonth, $payDay);
+            // Determine pay date month based on comparison logic
+            if ($payDay > $endDay) {
+                // Pay day comes after end day, so it's in the next month
+                $payDate = Carbon::create($currentYear, $currentMonth)->addMonth()->day($payDay);
             } else {
-                $payDate = Carbon::create($currentYear, $currentMonth)->addMonth()->startOfMonth()->addDays($payDay - 1);
+                // Pay day is in the same month as start/end
+                $payDate = Carbon::create($currentYear, $currentMonth, $payDay);
             }
         } else {
             // Period spans months (e.g., 21 to 20 next month)
             $periodStart = Carbon::create($currentYear, $currentMonth, $startDay);
-            $periodEnd = Carbon::create($currentYear, $currentMonth)->addMonth()->startOfMonth()->addDays($endDay - 1);
+            $periodEnd = Carbon::create($currentYear, $currentMonth)->addMonth()->day($endDay);
 
-            // Pay date is in the end period's month (next month)
-            $payDate = Carbon::create($currentYear, $currentMonth)->addMonth()->startOfMonth()->addDays($payDay - 1);
+            // For spanning periods, pay day is typically in the end month (next month)
+            if ($payDay <= $endDay) {
+                // Pay day is in the same month as end day (next month from start)
+                $payDate = Carbon::create($currentYear, $currentMonth)->addMonth()->day($payDay);
+            } else {
+                // Pay day is after end day, use same month as end
+                $payDate = Carbon::create($currentYear, $currentMonth)->addMonth()->day($payDay);
+            }
         }
 
         return [
@@ -8333,15 +8847,27 @@ class PayrollController extends Controller
         // Get all the data needed for the show view (simplified version)
         $employeeIds = $payroll->payrollDetails->pluck('employee_id');
 
-        $startDate = \Carbon\Carbon::parse($payroll->period_start);
-        $endDate = \Carbon\Carbon::parse($payroll->period_end);
+        // Use override period dates if available (for period-specific views)
+        $periodStart = $payroll->override_period_start ?? $payroll->period_start;
+        $periodEnd = $payroll->override_period_end ?? $payroll->period_end;
+        $payDate = $payroll->override_pay_date ?? $payroll->pay_date;
+
+        // Override the payroll properties for display in the view
+        if (isset($payroll->override_period_start)) {
+            $payroll->period_start = $periodStart;
+            $payroll->period_end = $periodEnd;
+            $payroll->pay_date = $payDate;
+        }
+
+        $startDate = \Carbon\Carbon::parse($periodStart);
+        $endDate = \Carbon\Carbon::parse($periodEnd);
         $periodDates = [];
         for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
             $periodDates[] = $date->format('Y-m-d');
         }
 
         $timeLogs = TimeLog::whereIn('employee_id', $employeeIds)
-            ->whereBetween('log_date', [$payroll->period_start, $payroll->period_end])
+            ->whereBetween('log_date', [$periodStart, $periodEnd])
             ->orderBy('log_date')
             ->get()
             ->groupBy(['employee_id']);
