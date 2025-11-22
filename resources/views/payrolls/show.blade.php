@@ -234,7 +234,8 @@
                                                             $calculatedBonusAmount,
                                                             $payroll->period_start,
                                                             $payroll->period_end,
-                                                            $employeePaySchedule
+                                                            $employeePaySchedule,
+                                                            $payroll->pay_schedule ?? null
                                                         );
                                                         $bonuses += $distributedAmount;
                                                     }
@@ -270,7 +271,8 @@
                                                             $calculatedIncentiveAmount,
                                                             $payroll->period_start,
                                                             $payroll->period_end,
-                                                            $employeePaySchedule
+                                                            $employeePaySchedule,
+                                                            $payroll->pay_schedule ?? null
                                                         );
                                                         $incentives += $distributedAmount;
                                                     }
@@ -328,7 +330,8 @@
                                                     $calculatedAmount,
                                                     $payroll->period_start,
                                                     $payroll->period_end,
-                                                    $detail->employee->pay_schedule ?? $payFrequency
+                                                    $detail->employee->pay_schedule ?? $payFrequency,
+                                                    $payroll->pay_schedule ?? null
                                                 );
                                             }
                                             
@@ -1774,19 +1777,18 @@
                                                             $displayAmount = $setting->maximum_amount;
                                                         }
                                                         
-                                                        // Apply distribution method
-                                                        $distributedAmount = 0;
-                                                        if ($displayAmount > 0) {
-                                                            $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
-                                                            $distributedAmount = $setting->calculateDistributedAmount(
-                                                                $displayAmount,
-                                                                $payroll->period_start,
-                                                                $payroll->period_end,
-                                                                $employeePaySchedule
-                                                            );
-                                                        }
-                                                        
-                                                        // Add to breakdown and total
+                                        // Apply distribution method
+                                        $distributedAmount = 0;
+                                        if ($displayAmount > 0) {
+                                            $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
+                                            $distributedAmount = $setting->calculateDistributedAmount(
+                                                $displayAmount,
+                                                $payroll->period_start,
+                                                $payroll->period_end,
+                                                $employeePaySchedule,
+                                                $payroll->pay_schedule ?? null
+                                            );
+                                        }                                                        // Add to breakdown and total
                                                         if ($distributedAmount > 0) {
                                                             $allowanceBreakdownDisplay[] = [
                                                                 'name' => $setting->name,
@@ -1927,7 +1929,8 @@
                                                                 $displayAmount,
                                                                 $payroll->period_start,
                                                                 $payroll->period_end,
-                                                                $employeePaySchedule
+                                                                $employeePaySchedule,
+                                                                $payroll->pay_schedule ?? null
                                                             );
                                                         }
                                                         
@@ -2044,16 +2047,15 @@
                                                             }
                                                         }
                                                         
-                                                        // Calculate distributed amount
-                                                        $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
-                                                        $distributedAmount = $setting->calculateDistributedAmount(
-                                                            $setting->fixed_amount ?? 0,
-                                                            $payroll->period_start,
-                                                            $payroll->period_end,
-                                                            $employeePaySchedule
-                                                        );
-                                                        
-                                                        $dynamicIncentiveTotal += $distributedAmount;
+                                        // Calculate distributed amount
+                                        $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
+                                        $distributedAmount = $setting->calculateDistributedAmount(
+                                            $setting->fixed_amount ?? 0,
+                                            $payroll->period_start,
+                                            $payroll->period_end,
+                                            $employeePaySchedule,
+                                            $payroll->pay_schedule ?? null
+                                        );                                                        $dynamicIncentiveTotal += $distributedAmount;
                                                     @endphp
                                                     @if($distributedAmount > 0)
                                                         <div class="text-xs text-gray-500">
@@ -2268,19 +2270,18 @@
                                         $displayAmount = $bonusSetting->calculateAmount($basicPay, $detail->employee->daily_rate, null, $detail->employee, $breakdownData);
                                     }
                                     
-                                    // Apply distribution method
-                                    $distributedAmount = 0;
-                                    if ($displayAmount > 0) {
-                                        $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
-                                        $distributedAmount = $bonusSetting->calculateDistributedAmount(
-                                            $displayAmount,
-                                            $payroll->period_start,
-                                            $payroll->period_end,
-                                            $employeePaySchedule
-                                        );
-                                    }
-                                    
-                                    $bonuses += $distributedAmount;
+                    // Apply distribution method
+                    $distributedAmount = 0;
+                    if ($displayAmount > 0) {
+                        $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
+                        $distributedAmount = $bonusSetting->calculateDistributedAmount(
+                            $displayAmount,
+                            $payroll->period_start,
+                            $payroll->period_end,
+                            $employeePaySchedule,
+                            $payroll->pay_schedule ?? null
+                        );
+                    }                                    $bonuses += $distributedAmount;
                                 }
             } else {
                 // For non-dynamic payrolls, use snapshot breakdown totals (CORRECT distributed amounts)
@@ -2320,19 +2321,18 @@
                                     
                                     $calculatedIncentiveAmount = $incentiveSetting->fixed_amount ?? 0;
                                     
-                                    // Apply distribution method
-                                    $distributedAmount = 0;
-                                    if ($calculatedIncentiveAmount > 0) {
-                                        $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
-                                        $distributedAmount = $incentiveSetting->calculateDistributedAmount(
-                                            $calculatedIncentiveAmount,
-                                            $payroll->period_start,
-                                            $payroll->period_end,
-                                            $employeePaySchedule
-                                        );
-                                    }
-                                    
-                                    $incentives += $distributedAmount;
+                    // Apply distribution method
+                    $distributedAmount = 0;
+                    if ($calculatedIncentiveAmount > 0) {
+                        $employeePaySchedule = $detail->employee->pay_schedule ?? 'semi_monthly';
+                        $distributedAmount = $incentiveSetting->calculateDistributedAmount(
+                            $calculatedIncentiveAmount,
+                            $payroll->period_start,
+                            $payroll->period_end,
+                            $employeePaySchedule,
+                            $payroll->pay_schedule ?? null
+                        );
+                    }                                    $incentives += $distributedAmount;
                                 }
             } else {
                 // For non-dynamic payrolls, use snapshot breakdown totals (CORRECT distributed amounts)
@@ -2505,7 +2505,8 @@
                                                 $calculatedBonusAmount,
                                                 $payroll->period_start,
                                                 $payroll->period_end,
-                                                $employeePaySchedule
+                                                $employeePaySchedule,
+                                                $payroll->pay_schedule ?? null
                                             );
                                             $bonusesForGross += $distributedAmount;
                                         }
@@ -2708,7 +2709,8 @@
                                                                     $calculatedAmount,
                                                                     $payroll->period_start,
                                                                     $payroll->period_end,
-                                                                    $employeePaySchedule
+                                                                    $employeePaySchedule,
+                                                                    $payroll->pay_schedule ?? null
                                                                 );
                                                                 
                                                                 // Add taxable allowance/bonus/incentive to taxable income
@@ -2820,7 +2822,8 @@
                                                     $calculatedAmount,
                                                     $payroll->period_start,
                                                     $payroll->period_end,
-                                                    $detail->employee->pay_schedule ?? $payFrequency
+                                                    $detail->employee->pay_schedule ?? $payFrequency,
+                                                    $payroll->pay_schedule ?? null
                                                 );
                                             }
                                             
@@ -3170,7 +3173,8 @@
                                                             $calculatedAmount,
                                                             $payroll->period_start,
                                                             $payroll->period_end,
-                                                            $detail->employee->pay_schedule ?? $payFrequency
+                                                            $detail->employee->pay_schedule ?? $payFrequency,
+                                                            $payroll->pay_schedule ?? null
                                                         );
                                                     }
                                                     

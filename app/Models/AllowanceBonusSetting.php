@@ -826,60 +826,93 @@ class AllowanceBonusSetting extends Model
     }
 
     /**
-     * Get the estimated number of payrolls in a month for a given pay schedule
+     * Get the dynamic number of payrolls in a month based on actual PaySchedule configuration
      */
     private function getPayrollCountInMonth($date, $paySchedule)
     {
-        switch ($paySchedule) {
-            case 'semi_monthly':
-            case 'semi-monthly':
-                return 2;
-            case 'weekly':
-                return 4; // Approximate
-            case 'daily':
-                return $date->daysInMonth; // Working days in month
-            case 'monthly':
-            default:
-                return 1;
+        // Try to get actual PaySchedule configuration
+        $schedule = \App\Models\PaySchedule::where('name', $paySchedule)->first();
+
+        if ($schedule && isset($schedule->cutoff_periods) && !empty($schedule->cutoff_periods)) {
+            // Dynamic count based on actual cutoff periods configuration
+            return count($schedule->cutoff_periods);
+        }
+
+        // Fallback: Calculate dynamically based on frequency pattern
+        if (in_array($paySchedule, ['semi_monthly', 'semi-monthly'])) {
+            // Most semi-monthly schedules have 2 periods per month
+            return 2;
+        } elseif ($paySchedule === 'weekly') {
+            // Calculate actual weeks in this specific month
+            $monthStart = $date->copy()->startOfMonth();
+            $monthEnd = $date->copy()->endOfMonth();
+            $weeks = 0;
+
+            $current = $monthStart->copy()->startOfWeek();
+            while ($current->lte($monthEnd)) {
+                if ($current->month === $date->month || $current->endOfWeek()->month === $date->month) {
+                    $weeks++;
+                }
+                $current->addWeek();
+            }
+
+            return $weeks;
+        } elseif ($paySchedule === 'daily') {
+            // Calculate working days dynamically (excluding weekends)
+            $workingDays = 0;
+            $current = $date->copy()->startOfMonth();
+            $monthEnd = $date->copy()->endOfMonth();
+
+            while ($current->lte($monthEnd)) {
+                if ($current->isWeekday()) {
+                    $workingDays++;
+                }
+                $current->addDay();
+            }
+
+            return $workingDays;
+        } else {
+            // Monthly or other frequencies
+            return 1;
         }
     }
 
     /**
-     * Get the estimated number of payrolls in a quarter for a given pay schedule
+     * Get the dynamic number of payrolls in a quarter based on actual calculations
      */
     private function getPayrollCountInQuarter($date, $paySchedule)
     {
-        switch ($paySchedule) {
-            case 'semi_monthly':
-            case 'semi-monthly':
-                return 6; // 3 months × 2 payrolls
-            case 'weekly':
-                return 13; // Approximate: 3 months × 4.33 weeks
-            case 'daily':
-                return 65; // Approximate: 3 months × ~22 working days
-            case 'monthly':
-            default:
-                return 3;
+        // Calculate dynamically by summing all months in the quarter
+        $quarterStart = $date->copy()->firstOfQuarter();
+        $quarterEnd = $date->copy()->lastOfQuarter();
+        $totalPayrolls = 0;
+
+        $current = $quarterStart->copy();
+        while ($current->lte($quarterEnd)) {
+            $totalPayrolls += $this->getPayrollCountInMonth($current, $paySchedule);
+            $current->addMonth();
         }
+
+        return $totalPayrolls;
     }
 
     /**
-     * Get the estimated number of payrolls in a year for a given pay schedule
+     * Get the dynamic number of payrolls in a year based on actual calculations
      */
     private function getPayrollCountInYear($date, $paySchedule)
     {
-        switch ($paySchedule) {
-            case 'semi_monthly':
-            case 'semi-monthly':
-                return 24; // 12 months × 2 payrolls
-            case 'weekly':
-                return 52; // 52 weeks in a year
-            case 'daily':
-                return 260; // Approximate: 52 weeks × 5 working days
-            case 'monthly':
-            default:
-                return 12;
+        // Calculate dynamically by summing all months in the year
+        $yearStart = $date->copy()->startOfYear();
+        $yearEnd = $date->copy()->endOfYear();
+        $totalPayrolls = 0;
+
+        $current = $yearStart->copy();
+        while ($current->lte($yearEnd)) {
+            $totalPayrolls += $this->getPayrollCountInMonth($current, $paySchedule);
+            $current->addMonth();
         }
+
+        return $totalPayrolls;
     }
 
     /**
@@ -894,74 +927,112 @@ class AllowanceBonusSetting extends Model
     }
 
     /**
-     * Determine semi-monthly cutoff using the same logic as payroll view
-     * This replicates the exact logic from resources/views/payrolls/show.blade.php
+     * Determine cutoff period dynamically based on actual PaySchedule configuration
+     * Supports any number of cutoff periods with any date ranges
      */
     private function determineSemiMonthlyCutoff($periodStart, $periodEnd, $payScheduleName = null)
     {
-        $cutoff = '1st'; // default
-
-        // Try to get the actual schedule to determine correct cutoff
+        // Try to get the actual schedule configuration
         if ($payScheduleName && $payScheduleName !== 'semi_monthly') {
-            // New system - find by schedule name (e.g., SEMI-1, SEMI-2)
             $actualSchedule = \App\Models\PaySchedule::where('name', $payScheduleName)->first();
-            if ($actualSchedule && isset($actualSchedule->cutoff_periods) && count($actualSchedule->cutoff_periods) >= 2) {
-                // Check which period this payroll falls into
+
+            if ($actualSchedule && isset($actualSchedule->cutoff_periods) && !empty($actualSchedule->cutoff_periods)) {
                 $periods = $actualSchedule->cutoff_periods;
-                $startDay = $periodStart->day;
-                $endDay = $periodEnd->day;
+                $payrollStartDay = $periodStart->day;
+                $payrollEndDay = $periodEnd->day;
 
-                // Check if this matches the first period configuration
-                $firstPeriodStart = is_numeric($periods[0]['start_day']) ? (int)$periods[0]['start_day'] : 1;
-                $firstPeriodEnd = is_numeric($periods[0]['end_day']) ? (int)$periods[0]['end_day'] : 15;
+                // Dynamic cutoff detection - iterate through all configured periods
+                foreach ($periods as $index => $period) {
+                    $configStartDay = is_numeric($period['start_day']) ? (int)$period['start_day'] : null;
+                    $configEndDay = is_numeric($period['end_day']) ? (int)$period['end_day'] : null;
 
-                // Check if this matches the second period configuration  
-                $secondPeriodStart = is_numeric($periods[1]['start_day']) ? (int)$periods[1]['start_day'] : 16;
-
-                // Determine cutoff based on period start day matching configuration
-                // Handle cross-month periods properly (e.g., SEMI-2: 21-5 and 6-20)
-                if ($firstPeriodEnd < $firstPeriodStart) {
-                    // First period is cross-month (e.g., 21 to 5)
-                    if ($startDay >= $firstPeriodStart || $startDay <= $firstPeriodEnd) {
-                        $cutoff = '1st';
-                    } else {
-                        $cutoff = '2nd';
+                    if ($configStartDay === null || $configEndDay === null) {
+                        continue; // Skip invalid period configurations
                     }
-                } else {
-                    // Standard same-month periods
-                    if ($startDay >= $secondPeriodStart || ($startDay > $firstPeriodEnd)) {
-                        $cutoff = '2nd';
+
+                    // Check if payroll period matches this cutoff configuration
+                    $isMatch = false;
+
+                    if ($configEndDay < $configStartDay) {
+                        // Cross-month period (e.g., 21-5: starts late in month, ends early next month)
+                        $isMatch = ($payrollStartDay >= $configStartDay) || ($payrollStartDay <= $configEndDay);
                     } else {
-                        $cutoff = '1st';
+                        // Same-month period (e.g., 6-20: starts and ends in same month)
+                        $isMatch = ($payrollStartDay >= $configStartDay) && ($payrollStartDay <= $configEndDay);
+                    }
+
+                    // Additional validation: check if end day also matches (for more precision)
+                    if ($isMatch) {
+                        if ($configEndDay < $configStartDay) {
+                            // Cross-month: end day should be <= config end day or >= config start day
+                            $endMatches = ($payrollEndDay <= $configEndDay) || ($payrollEndDay >= $configStartDay);
+                        } else {
+                            // Same-month: end day should be within the range
+                            $endMatches = ($payrollEndDay >= $configStartDay) && ($payrollEndDay <= $configEndDay);
+                        }
+
+                        if ($endMatches) {
+                            // Return dynamic cutoff number (1st, 2nd, 3rd, etc.)
+                            return $this->getOrdinalNumber($index + 1);
+                        }
                     }
                 }
             }
-        } else {
-            // Legacy system - use simple day check
-            $cutoff = $periodStart->day <= 15 ? '1st' : '2nd';
         }
 
-        return $cutoff;
+        // Fallback: If no pay schedule found or no match, determine dynamically based on month position
+        $monthMidpoint = (int)ceil($periodStart->daysInMonth / 2);
+        return $periodStart->day <= $monthMidpoint ? '1st' : '2nd';
     }
 
     /**
-     * Determine if a weekly payroll period is the first week of the month
+     * Generate ordinal number (1st, 2nd, 3rd, 4th, etc.) dynamically
+     */
+    private function getOrdinalNumber($number)
+    {
+        $suffix = 'th';
+        if ($number % 100 < 11 || $number % 100 > 13) {
+            switch ($number % 10) {
+                case 1:
+                    $suffix = 'st';
+                    break;
+                case 2:
+                    $suffix = 'nd';
+                    break;
+                case 3:
+                    $suffix = 'rd';
+                    break;
+            }
+        }
+        return $number . $suffix;
+    }
+
+    /**
+     * Determine if a weekly payroll period is the first week of the month (dynamic)
      */
     private function isFirstWeekOfMonth($periodStart, $periodEnd)
     {
-        // Simple logic: if the period starts in the first week of the month (day 1-7)
-        // This is more flexible than trying to match exact week boundaries
-        return $periodStart->day <= 7;
+        // Dynamic logic: calculate what constitutes "first week" based on month structure
+        $monthStart = $periodStart->copy()->startOfMonth();
+        $weekSize = 7; // Standard week
+
+        // Calculate the boundary for first week dynamically
+        $firstWeekEnd = min($weekSize, $monthStart->daysInMonth);
+
+        return $periodStart->day <= $firstWeekEnd;
     }
 
     /**
-     * Determine if a weekly payroll period is the last week of the month
+     * Determine if a weekly payroll period is the last week of the month (dynamic)
      */
     private function isLastWeekOfMonth($periodStart, $periodEnd)
     {
         $monthEnd = $periodStart->copy()->endOfMonth();
+        $weekSize = 7; // Standard week
 
-        // If the period ends in the last 7 days of the month, consider it the last week
-        return $periodEnd->day > ($monthEnd->day - 7);
+        // Calculate the boundary for last week dynamically based on month length
+        $lastWeekStart = max(1, $monthEnd->day - $weekSize + 1);
+
+        return $periodEnd->day >= $lastWeekStart;
     }
 }
