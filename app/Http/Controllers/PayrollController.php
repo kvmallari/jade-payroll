@@ -2747,12 +2747,20 @@ class PayrollController extends Controller
                         $periodEnd
                     );
 
+                    // Get payroll schedule name for better cutoff detection
+                    $payScheduleName = null;
+                    $payroll = request()->route('payroll');
+                    if ($payroll && $payroll instanceof \App\Models\Payroll) {
+                        $payScheduleName = $payroll->pay_schedule;
+                    }
+
                     // Apply distribution logic using the model method
                     $amount = $setting->calculateDistributedAmount(
                         $amount,
                         $periodStart,
                         $periodEnd,
-                        $employeePaySchedule
+                        $employeePaySchedule,
+                        $payScheduleName
                     );
                 } else {
                     // Fallback to route-based payroll context for backward compatibility

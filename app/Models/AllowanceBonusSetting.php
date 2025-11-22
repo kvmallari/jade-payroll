@@ -613,11 +613,31 @@ class AllowanceBonusSetting extends Model
     /**
      * Calculate the distributed allowance/bonus amount for a specific payroll period based on frequency and distribution method
      */
-    public function calculateDistributedAmount($originalAmount, $payrollStart, $payrollEnd, $employeePaySchedule = null)
+    public function calculateDistributedAmount($originalAmount, $payrollStart, $payrollEnd, $employeePaySchedule = null, $payScheduleName = null)
     {
         // If frequency is per_payroll, always return the full amount
         if ($this->frequency === 'per_payroll') {
             return $originalAmount;
+        }
+
+        // If pay schedule name not provided, try to get it from current payroll context
+        if (!$payScheduleName) {
+            $payroll = request()->route('payroll');
+            if ($payroll && $payroll instanceof \App\Models\Payroll) {
+                $payScheduleName = $payroll->pay_schedule;
+            } else {
+                // For automation routes, try to get schedule from route parameters
+                $scheduleParam = request()->route('schedule') ?? request()->route('pay_schedule');
+                if ($scheduleParam) {
+                    $payScheduleName = $scheduleParam;
+                } else {
+                    // Fallback: try to extract from URL segments (for /payrolls/automation/SEMI-2/...)
+                    $segments = request()->segments();
+                    if (count($segments) >= 3 && $segments[0] === 'payrolls' && $segments[1] === 'automation') {
+                        $payScheduleName = $segments[2]; // SEMI-2, SEMI-1, etc.
+                    }
+                }
+            }
         }
 
         // Parse the payroll period dates
@@ -627,7 +647,7 @@ class AllowanceBonusSetting extends Model
         // Apply frequency and distribution logic
         switch ($this->frequency) {
             case 'monthly':
-                return $this->calculateMonthlyDistribution($originalAmount, $periodStart, $periodEnd, $employeePaySchedule);
+                return $this->calculateMonthlyDistribution($originalAmount, $periodStart, $periodEnd, $employeePaySchedule, $payScheduleName);
             case 'quarterly':
                 return $this->calculateQuarterlyDistribution($originalAmount, $periodStart, $periodEnd, $employeePaySchedule);
             case 'annually':
@@ -640,14 +660,14 @@ class AllowanceBonusSetting extends Model
     /**
      * Calculate monthly distribution based on distribution method
      */
-    private function calculateMonthlyDistribution($originalAmount, $periodStart, $periodEnd, $employeePaySchedule)
+    private function calculateMonthlyDistribution($originalAmount, $periodStart, $periodEnd, $employeePaySchedule, $payScheduleName = null)
     {
         switch ($this->distribution_method) {
             case 'first_payroll':
-                return $this->isFirstPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule) ? $originalAmount : 0;
+                return $this->isFirstPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule, $payScheduleName) ? $originalAmount : 0;
 
             case 'last_payroll':
-                return $this->isLastPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule) ? $originalAmount : 0;
+                return $this->isLastPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule, $payScheduleName) ? $originalAmount : 0;
 
             case 'equally_distributed':
                 $payrollsInMonth = $this->getPayrollCountInMonth($periodStart, $employeePaySchedule);
@@ -703,16 +723,16 @@ class AllowanceBonusSetting extends Model
     /**
      * Check if the given period is the first payroll of the month
      */
-    private function isFirstPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule)
+    private function isFirstPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule, $payScheduleName = null)
     {
-        // For semi-monthly: first payroll typically covers 1st to 15th
+        // For semi-monthly: use the same logic as the payroll view to determine cutoff
         if (in_array($employeePaySchedule, ['semi_monthly', 'semi-monthly'])) {
-            return $periodStart->day <= 15;
+            return $this->determineSemiMonthlyCutoff($periodStart, $periodEnd, $payScheduleName) === '1st';
         }
 
-        // For weekly: check if this is the first week of the month
+        // For weekly: determine if this is the first week of the month
         if ($employeePaySchedule === 'weekly') {
-            return $periodStart->day <= 7;
+            return $this->isFirstWeekOfMonth($periodStart, $periodEnd);
         }
 
         // For daily: check if this is the first day of the month
@@ -727,22 +747,21 @@ class AllowanceBonusSetting extends Model
     /**
      * Check if the given period is the last payroll of the month
      */
-    private function isLastPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule)
+    private function isLastPayrollOfMonth($periodStart, $periodEnd, $employeePaySchedule, $payScheduleName = null)
     {
-        $monthEnd = $periodStart->copy()->endOfMonth();
-
-        // For semi-monthly: last payroll typically covers 16th to end of month
+        // For semi-monthly: use the same logic as the payroll view to determine cutoff
         if (in_array($employeePaySchedule, ['semi_monthly', 'semi-monthly'])) {
-            return $periodStart->day > 15;
+            return $this->determineSemiMonthlyCutoff($periodStart, $periodEnd, $payScheduleName) === '2nd';
         }
 
-        // For weekly: check if this period ends near month end
+        // For weekly: determine if this is the last week of the month
         if ($employeePaySchedule === 'weekly') {
-            return $periodEnd->day >= $monthEnd->day - 7;
+            return $this->isLastWeekOfMonth($periodStart, $periodEnd);
         }
 
         // For daily: check if this is the last day of the month
         if ($employeePaySchedule === 'daily') {
+            $monthEnd = $periodStart->copy()->endOfMonth();
             return $periodEnd->day === $monthEnd->day;
         }
 
@@ -872,5 +891,77 @@ class AllowanceBonusSetting extends Model
             $q->where('benefit_eligibility', 'both')
                 ->orWhere('benefit_eligibility', $benefitStatus);
         });
+    }
+
+    /**
+     * Determine semi-monthly cutoff using the same logic as payroll view
+     * This replicates the exact logic from resources/views/payrolls/show.blade.php
+     */
+    private function determineSemiMonthlyCutoff($periodStart, $periodEnd, $payScheduleName = null)
+    {
+        $cutoff = '1st'; // default
+
+        // Try to get the actual schedule to determine correct cutoff
+        if ($payScheduleName && $payScheduleName !== 'semi_monthly') {
+            // New system - find by schedule name (e.g., SEMI-1, SEMI-2)
+            $actualSchedule = \App\Models\PaySchedule::where('name', $payScheduleName)->first();
+            if ($actualSchedule && isset($actualSchedule->cutoff_periods) && count($actualSchedule->cutoff_periods) >= 2) {
+                // Check which period this payroll falls into
+                $periods = $actualSchedule->cutoff_periods;
+                $startDay = $periodStart->day;
+                $endDay = $periodEnd->day;
+
+                // Check if this matches the first period configuration
+                $firstPeriodStart = is_numeric($periods[0]['start_day']) ? (int)$periods[0]['start_day'] : 1;
+                $firstPeriodEnd = is_numeric($periods[0]['end_day']) ? (int)$periods[0]['end_day'] : 15;
+
+                // Check if this matches the second period configuration  
+                $secondPeriodStart = is_numeric($periods[1]['start_day']) ? (int)$periods[1]['start_day'] : 16;
+
+                // Determine cutoff based on period start day matching configuration
+                // Handle cross-month periods properly (e.g., SEMI-2: 21-5 and 6-20)
+                if ($firstPeriodEnd < $firstPeriodStart) {
+                    // First period is cross-month (e.g., 21 to 5)
+                    if ($startDay >= $firstPeriodStart || $startDay <= $firstPeriodEnd) {
+                        $cutoff = '1st';
+                    } else {
+                        $cutoff = '2nd';
+                    }
+                } else {
+                    // Standard same-month periods
+                    if ($startDay >= $secondPeriodStart || ($startDay > $firstPeriodEnd)) {
+                        $cutoff = '2nd';
+                    } else {
+                        $cutoff = '1st';
+                    }
+                }
+            }
+        } else {
+            // Legacy system - use simple day check
+            $cutoff = $periodStart->day <= 15 ? '1st' : '2nd';
+        }
+
+        return $cutoff;
+    }
+
+    /**
+     * Determine if a weekly payroll period is the first week of the month
+     */
+    private function isFirstWeekOfMonth($periodStart, $periodEnd)
+    {
+        // Simple logic: if the period starts in the first week of the month (day 1-7)
+        // This is more flexible than trying to match exact week boundaries
+        return $periodStart->day <= 7;
+    }
+
+    /**
+     * Determine if a weekly payroll period is the last week of the month
+     */
+    private function isLastWeekOfMonth($periodStart, $periodEnd)
+    {
+        $monthEnd = $periodStart->copy()->endOfMonth();
+
+        // If the period ends in the last 7 days of the month, consider it the last week
+        return $periodEnd->day > ($monthEnd->day - 7);
     }
 }

@@ -194,7 +194,8 @@
                                                             $calculatedAllowanceAmount,
                                                             $payroll->period_start,
                                                             $payroll->period_end,
-                                                            $employeePaySchedule
+                                                            $employeePaySchedule,
+                                                            $payroll->pay_schedule ?? null
                                                         );
                                                         $allowances += $distributedAmount;
                                                     }
@@ -422,6 +423,9 @@
                                 switch ($paySchedule) {
                                     case 'semi_monthly':
                                     case 'semi-monthly':
+                                    case 'SEMI-1':
+                                    case 'SEMI-2': 
+                                    case 'SEMI-3':
                                         // Determine cutoff based on actual schedule configuration
                                         $cutoff = '1st'; // default
                                         
@@ -444,10 +448,21 @@
                                                 $secondPeriodStart = is_numeric($periods[1]['start_day']) ? (int)$periods[1]['start_day'] : 16;
                                                 
                                                 // Determine cutoff based on period start day matching configuration
-                                                if ($startDay >= $secondPeriodStart || ($startDay > $firstPeriodEnd)) {
-                                                    $cutoff = '2nd';
+                                                // Handle cross-month periods properly (e.g., SEMI-2: 21-5 and 6-20)
+                                                if ($firstPeriodEnd < $firstPeriodStart) {
+                                                    // First period is cross-month (e.g., 21 to 5)
+                                                    if ($startDay >= $firstPeriodStart || $startDay <= $firstPeriodEnd) {
+                                                        $cutoff = '1st';
+                                                    } else {
+                                                        $cutoff = '2nd';
+                                                    }
                                                 } else {
-                                                    $cutoff = '1st';
+                                                    // Standard same-month periods
+                                                    if ($startDay >= $secondPeriodStart || ($startDay > $firstPeriodEnd)) {
+                                                        $cutoff = '2nd';
+                                                    } else {
+                                                        $cutoff = '1st';
+                                                    }
                                                 }
                                             }
                                         } else {
@@ -459,60 +474,32 @@
                                         break;
                                         
                                     case 'monthly':
+                                    case 'MONTH-1':
                                         $monthName = $periodStart->format('F');
                                         $payFrequencyDisplay = "Monthly - {$monthName}";
                                         break;
                                         
                                     case 'weekly':
-                                        // Calculate which week of the month this is based on Sunday-Saturday weeks
-                                        // Find the Saturday that ends this week period
-                                        $saturdayEnd = $periodEnd->copy();
-                                        while ($saturdayEnd->dayOfWeek !== 6) { // 6 = Saturday
-                                            $saturdayEnd->addDay();
-                                        }
-                                        
-                                        // Find all Saturdays in this month to determine week number
-                                        $monthStart = $saturdayEnd->copy()->startOfMonth();
-                                        $weekNumber = 0;
-                                        $currentSaturday = $monthStart->copy();
-                                        
-                                        // Find first Saturday of the month
-                                        while ($currentSaturday->dayOfWeek !== 6) {
-                                            $currentSaturday->addDay();
-                                        }
-                                        
-                                        // Count Saturdays until we reach our target Saturday
-                                        while ($currentSaturday->lte($saturdayEnd)) {
-                                            $weekNumber++;
-                                            if ($currentSaturday->format('Y-m-d') === $saturdayEnd->format('Y-m-d')) {
-                                                break;
-                                            }
-                                            $currentSaturday->addWeek();
-                                        }
+                                    case 'WEEK-1':
+                                        // Use same simple calculation as schedule overview
+                                        $dayOfMonth = $periodStart->day;
+                                        $weekNumber = (int) ceil($dayOfMonth / 7);
                                         
                                         $weekOrdinal = match($weekNumber) {
                                             1 => '1st',
                                             2 => '2nd', 
                                             3 => '3rd',
                                             4 => '4th',
-                                            default => '5th'
+                                            default => $weekNumber . 'th'
                                         };
                                         $payFrequencyDisplay = "Weekly - {$weekOrdinal}";
                                         break;
                                         
                                     case 'daily':
-                                        $dayOfMonth = $periodStart->day;
-                                        $dayOrdinal = match($dayOfMonth % 10) {
-                                            1 => $dayOfMonth . 'st',
-                                            2 => $dayOfMonth . 'nd', 
-                                            3 => $dayOfMonth . 'rd',
-                                            default => $dayOfMonth . 'th'
-                                        };
-                                        // Handle special cases for 11th, 12th, 13th
-                                        if (in_array($dayOfMonth, [11, 12, 13])) {
-                                            $dayOrdinal = $dayOfMonth . 'th';
-                                        }
-                                        $payFrequencyDisplay = "Daily - {$dayOrdinal}";
+                                    case 'DAILY-1':
+                                        // Use day name like schedule overview
+                                        $dayName = $periodStart->format('l'); // Monday, Tuesday, etc.
+                                        $payFrequencyDisplay = "Daily - {$dayName}";
                                         break;
                                         
                                     default:
@@ -2232,7 +2219,8 @@
                                             $displayAmount,
                                             $payroll->period_start,
                                             $payroll->period_end,
-                                            $employeePaySchedule
+                                            $employeePaySchedule,
+                                            $payroll->pay_schedule ?? null
                                         );
                                     }
                                     
