@@ -12,10 +12,10 @@ class SettingsContextMenu {
 
     init() {
         // Create context menu if it doesn't exist
-        if (!document.getElementById('contextMenu')) {
+        if (!document.getElementById("contextMenu")) {
             this.createContextMenu();
         }
-        this.contextMenu = document.getElementById('contextMenu');
+        this.contextMenu = document.getElementById("contextMenu");
         this.bindEvents();
     }
 
@@ -56,14 +56,14 @@ class SettingsContextMenu {
                 </div>
             </div>
         `;
-        document.body.insertAdjacentHTML('beforeend', contextMenuHTML);
+        document.body.insertAdjacentHTML("beforeend", contextMenuHTML);
     }
 
     bindEvents() {
         // Hide context menu when clicking elsewhere
-        document.addEventListener('click', () => this.hide());
-        document.addEventListener('contextmenu', (e) => {
-            if (!e.target.closest('[data-context-menu]')) {
+        document.addEventListener("click", () => this.hide());
+        document.addEventListener("contextmenu", (e) => {
+            if (!e.target.closest("[data-context-menu]")) {
                 this.hide();
             }
         });
@@ -76,30 +76,38 @@ class SettingsContextMenu {
         this.currentItemId = config.id;
 
         // Update context menu content
-        document.getElementById('contextMenuName').textContent = config.name;
-        document.getElementById('contextMenuSubtitle').textContent = config.subtitle || '';
+        document.getElementById("contextMenuName").textContent = config.name;
+        document.getElementById("contextMenuSubtitle").textContent =
+            config.subtitle || "";
 
         // Update action texts
-        if (config.viewText) document.getElementById('viewText').textContent = config.viewText;
-        if (config.editText) document.getElementById('editText').textContent = config.editText;
-        if (config.deleteText) document.getElementById('deleteText').textContent = config.deleteText;
+        if (config.viewText)
+            document.getElementById("viewText").textContent = config.viewText;
+        if (config.editText)
+            document.getElementById("editText").textContent = config.editText;
+        if (config.deleteText)
+            document.getElementById("deleteText").textContent =
+                config.deleteText;
 
         // Update links
-        document.getElementById('contextMenuView').href = config.viewUrl || '#';
-        document.getElementById('contextMenuEdit').href = config.editUrl || '#';
+        document.getElementById("contextMenuView").href = config.viewUrl || "#";
+        document.getElementById("contextMenuEdit").href = config.editUrl || "#";
 
         // Update toggle button text
-        const toggleText = document.getElementById('toggleText');
-        toggleText.textContent = config.isActive ? 'Deactivate' : 'Activate';
+        const toggleText = document.getElementById("toggleText");
+        toggleText.textContent = config.isActive ? "Deactivate" : "Activate";
 
         // Show/hide delete option
-        const deleteOption = document.getElementById('contextMenuDelete');
-        deleteOption.style.display = config.canDelete !== false ? 'flex' : 'none';
+        const deleteOption = document.getElementById("contextMenuDelete");
+        deleteOption.style.display =
+            config.canDelete !== false ? "flex" : "none";
 
         // Store URLs for form actions
         this.toggleUrl = config.toggleUrl;
         this.deleteUrl = config.deleteUrl;
-        this.deleteConfirmMessage = config.deleteConfirmMessage || 'Are you sure you want to delete this item?';
+        this.deleteConfirmMessage =
+            config.deleteConfirmMessage ||
+            "Are you sure you want to delete this item?";
 
         // Position and show context menu
         this.showAtPosition(event);
@@ -109,13 +117,13 @@ class SettingsContextMenu {
         const mouseX = event.clientX;
         const mouseY = event.clientY;
 
-        this.contextMenu.style.left = mouseX + 'px';
-        this.contextMenu.style.top = mouseY + 'px';
-        this.contextMenu.classList.remove('hidden');
+        this.contextMenu.style.left = mouseX + "px";
+        this.contextMenu.style.top = mouseY + "px";
+        this.contextMenu.classList.remove("hidden");
 
         setTimeout(() => {
-            this.contextMenu.classList.remove('opacity-0', 'scale-95');
-            this.contextMenu.classList.add('opacity-100', 'scale-100');
+            this.contextMenu.classList.remove("opacity-0", "scale-95");
+            this.contextMenu.classList.add("opacity-100", "scale-100");
         }, 10);
 
         // Adjust position to prevent menu from going off-screen
@@ -138,47 +146,50 @@ class SettingsContextMenu {
             adjustedX = Math.max(10, adjustedX);
             adjustedY = Math.max(10, adjustedY);
 
-            this.contextMenu.style.left = adjustedX + 'px';
-            this.contextMenu.style.top = adjustedY + 'px';
+            this.contextMenu.style.left = adjustedX + "px";
+            this.contextMenu.style.top = adjustedY + "px";
         }, 20);
     }
 
     hide() {
         if (!this.contextMenu) return;
 
-        this.contextMenu.classList.add('opacity-0', 'scale-95');
-        this.contextMenu.classList.remove('opacity-100', 'scale-100');
+        this.contextMenu.classList.add("opacity-0", "scale-95");
+        this.contextMenu.classList.remove("opacity-100", "scale-100");
         setTimeout(() => {
-            this.contextMenu.classList.add('hidden');
+            this.contextMenu.classList.add("hidden");
         }, 150);
     }
 
     // Helper method to submit forms
-    submitForm(action, method = 'POST', additionalFields = {}) {
-        const form = document.createElement('form');
-        form.method = 'POST';
+    submitForm(action, method = "POST", additionalFields = {}) {
+        const form = document.createElement("form");
+        form.method = "POST";
         form.action = action;
 
         // CSRF token
-        const csrfToken = document.createElement('input');
-        csrfToken.type = 'hidden';
-        csrfToken.name = '_token';
-        csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const csrfToken = document.createElement("input");
+        csrfToken.type = "hidden";
+        csrfToken.name = "_token";
+        csrfToken.value =
+            document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute("content") || "";
         form.appendChild(csrfToken);
 
         // Method override if needed
-        if (method !== 'POST') {
-            const methodField = document.createElement('input');
-            methodField.type = 'hidden';
-            methodField.name = '_method';
+        if (method !== "POST") {
+            const methodField = document.createElement("input");
+            methodField.type = "hidden";
+            methodField.name = "_method";
             methodField.value = method;
             form.appendChild(methodField);
         }
 
         // Additional fields
         Object.entries(additionalFields).forEach(([name, value]) => {
-            const field = document.createElement('input');
-            field.type = 'hidden';
+            const field = document.createElement("input");
+            field.type = "hidden";
             field.name = name;
             field.value = value;
             form.appendChild(field);
@@ -190,24 +201,32 @@ class SettingsContextMenu {
 
     // Set up toggle functionality
     setupToggle() {
-        document.getElementById('contextMenuToggle').addEventListener('click', (e) => {
-            e.preventDefault();
-            if (this.currentItemId && this.toggleUrl) {
-                this.submitForm(this.toggleUrl, 'PATCH');
-            }
-            this.hide();
-        });
+        document
+            .getElementById("contextMenuToggle")
+            .addEventListener("click", (e) => {
+                e.preventDefault();
+                if (this.currentItemId && this.toggleUrl) {
+                    this.submitForm(this.toggleUrl, "PATCH");
+                }
+                this.hide();
+            });
     }
 
     // Set up delete functionality
     setupDelete() {
-        document.getElementById('contextMenuDelete').addEventListener('click', (e) => {
-            e.preventDefault();
-            if (this.currentItemId && this.deleteUrl && confirm(this.deleteConfirmMessage)) {
-                this.submitForm(this.deleteUrl, 'DELETE');
-            }
-            this.hide();
-        });
+        document
+            .getElementById("contextMenuDelete")
+            .addEventListener("click", (e) => {
+                e.preventDefault();
+                if (
+                    this.currentItemId &&
+                    this.deleteUrl &&
+                    confirm(this.deleteConfirmMessage)
+                ) {
+                    this.submitForm(this.deleteUrl, "DELETE");
+                }
+                this.hide();
+            });
     }
 }
 
@@ -215,7 +234,7 @@ class SettingsContextMenu {
 window.settingsContextMenu = new SettingsContextMenu();
 
 // Set up toggle and delete handlers after DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
     window.settingsContextMenu.setupToggle();
     window.settingsContextMenu.setupDelete();
 });

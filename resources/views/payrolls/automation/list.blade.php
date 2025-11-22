@@ -100,11 +100,19 @@
                                                         'id' => $payroll->id
                                                     ]);
                                                 } else {
-                                                    // Use regular route
-                                                    $payrollUrl = route('payrolls.automation.show', [
-                                                        'schedule' => $scheduleCode, 
-                                                        'id' => $payroll->payrollDetails->first()->employee_id
-                                                    ]);
+                                                    // Use appropriate route based on context
+                                                    if (isset($isLastPayroll) && $isLastPayroll) {
+                                                        $payrollUrl = route('payrolls.automation.show', [
+                                                            'schedule' => $scheduleCode, 
+                                                            'id' => $payroll->payrollDetails->first()->employee_id,
+                                                            'from_last_payroll' => 'true'
+                                                        ]);
+                                                    } else {
+                                                        $payrollUrl = route('payrolls.automation.show', [
+                                                            'schedule' => $scheduleCode, 
+                                                            'id' => $payroll->payrollDetails->first()->employee_id
+                                                        ]);
+                                                    }
                                                 }
                                             } else {
                                                 // Multi-employee payroll, use general payroll route

@@ -1322,6 +1322,9 @@ class PayrollController extends Controller
             case 'current':
                 return $this->calculateCurrentPayPeriodForSchedule($paySchedule);
 
+            case 'last':
+                return $this->calculatePreviousPayPeriodForSchedule($paySchedule);
+
             case '1st':
                 if ($paySchedule->type === 'semi_monthly') {
                     // Calculate 1st period of current month
@@ -1651,9 +1654,101 @@ class PayrollController extends Controller
     }
 
     /**
+     * Generate payroll based on last payroll period
+     */
+    public function automationLastPayroll(Request $request, $schedule)
+    {
+        $this->authorize('view payrolls');
+
+        // Handle both new PaySchedule names and legacy PayScheduleSetting codes
+        $selectedSchedule = null;
+        $scheduleCode = null;
+
+        // Try to find by name first (new system)
+        $paySchedule = PaySchedule::active()
+            ->where('name', $schedule)
+            ->first();
+
+        if ($paySchedule) {
+            // For new schedules, use the name as the code for payroll queries
+            $scheduleCode = $paySchedule->name;
+            $selectedSchedule = (object) [
+                'code' => $paySchedule->name,
+                'name' => $paySchedule->name,
+                'type' => $paySchedule->type,
+                'id' => $paySchedule->id,
+                'route_name' => $paySchedule->name
+            ];
+        } else if (is_numeric($schedule)) {
+            // Fallback: try by ID (new system)
+            $paySchedule = PaySchedule::active()->find($schedule);
+            if ($paySchedule) {
+                $scheduleCode = $paySchedule->name;
+                $selectedSchedule = (object) [
+                    'code' => $paySchedule->name,
+                    'name' => $paySchedule->name,
+                    'type' => $paySchedule->type,
+                    'id' => $paySchedule->id,
+                    'route_name' => $paySchedule->name
+                ];
+            }
+        } else {
+            // Legacy system - PayScheduleSetting model
+            $legacySchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                ->where('code', $schedule)
+                ->first();
+            if ($legacySchedule) {
+                $scheduleCode = $legacySchedule->code;
+                $selectedSchedule = $legacySchedule;
+            }
+        }
+
+        if (!$selectedSchedule) {
+            return redirect()->route('payrolls.automation.index')
+                ->with('error', 'Invalid pay schedule selected.');
+        }
+
+        // Calculate last payroll period instead of current period
+        if (isset($selectedSchedule->id) && $paySchedule) {
+            // New PaySchedule system
+            try {
+                $lastPeriod = $this->calculatePreviousPayPeriodForSchedule($paySchedule);
+                if (!$lastPeriod) {
+                    return redirect()->route('payrolls.automation.list', ['schedule' => $schedule])
+                        ->with('error', 'No previous payroll period found.');
+                }
+            } catch (\Exception $e) {
+                return redirect()->route('payrolls.automation.list', ['schedule' => $schedule])
+                    ->with('error', 'Unable to calculate previous payroll period.');
+            }
+        } else {
+            // Legacy PayScheduleSetting system
+            $lastPeriod = $this->calculatePreviousPayPeriod($selectedSchedule);
+            if (!$lastPeriod) {
+                return redirect()->route('payrolls.automation.list', ['schedule' => $schedule])
+                    ->with('error', 'No previous payroll period found.');
+            }
+        }
+
+        // Check if payrolls exist for this last period
+        $existingPayrolls = Payroll::with(['creator', 'approver', 'payrollDetails.employee'])
+            ->withCount('payrollDetails')
+            ->where('pay_schedule', $scheduleCode)
+            ->where('payroll_type', 'automated')
+            ->where('period_start', $lastPeriod['start'])
+            ->where('period_end', $lastPeriod['end'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Use the same showDraftMode logic but with last period
+        $routeName = isset($selectedSchedule->route_name) ? $selectedSchedule->route_name : $scheduleCode;
+        return $this->showDraftMode($selectedSchedule, $lastPeriod, $scheduleCode, $routeName, true);
+    }
+
+    /**
      * Show draft mode with dynamic calculations (not saved to DB)
      */
-    private function showDraftMode($selectedSchedule, $currentPeriod, $schedule, $routeName = null)
+    private function showDraftMode($selectedSchedule, $currentPeriod, $schedule, $routeName = null, $isLastPayroll = false)
     {
         // Get employees who already have payroll records for this period
         $employeesWithPayrolls = Payroll::whereHas('payrollDetails')
@@ -1721,6 +1816,7 @@ class PayrollController extends Controller
                 'allEmployeesHavePayrolls' => ($allActiveEmployees > 0),
                 'noActiveEmployees' => ($allActiveEmployees == 0),
                 'totalActiveEmployees' => $allActiveEmployees,
+                'isLastPayroll' => $isLastPayroll,
                 'draftTotals' => [
                     'gross' => 0,
                     'deductions' => 0,
@@ -1806,6 +1902,7 @@ class PayrollController extends Controller
             'payrolls' => $mockPaginator,
             'hasPayrolls' => false,
             'allApproved' => false,
+            'isLastPayroll' => $isLastPayroll,
             'draftTotals' => [
                 'gross' => $totalGross,
                 'deductions' => $totalDeductions,
@@ -9325,8 +9422,16 @@ class PayrollController extends Controller
         // First, check if this ID is a payroll ID (for saved/historical payrolls)
         $payroll = Payroll::with(['payrollDetails.employee', 'creator', 'approver'])
             ->where('id', $id)
-            ->where('pay_schedule', $schedule)
             ->first();
+
+        // Verify the payroll belongs to the correct schedule context
+        if ($payroll && $payroll->pay_schedule !== $schedule) {
+            // Schedule mismatch - redirect to correct schedule
+            return redirect()->route('payrolls.automation.show', [
+                'schedule' => $payroll->pay_schedule,
+                'id' => $id
+            ]);
+        }
 
         if ($payroll) {
             // This is a saved payroll - show historical data
@@ -9348,22 +9453,50 @@ class PayrollController extends Controller
                 ->with('error', 'Employee or payroll not found.');
         }
 
-        // Use the appropriate period calculation method based on system type
-        if (isset($selectedSchedule->id) && $paySchedule) {
-            // New PaySchedule system
-            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        // Determine if this is coming from last-payroll context
+        $isLastPayrollContext = $request->get('from_last_payroll', false);
+
+        // Use the appropriate period calculation method based on system type and context
+        if ($isLastPayrollContext) {
+            // Calculate last/previous period instead of current
+            if (isset($selectedSchedule->id) && $paySchedule) {
+                // New PaySchedule system
+                try {
+                    $targetPeriod = $this->calculatePreviousPayPeriodForSchedule($paySchedule);
+                    if (!$targetPeriod) {
+                        return redirect()->route('payrolls.automation.last-payroll', ['schedule' => $schedule])
+                            ->with('error', 'No previous payroll period found.');
+                    }
+                } catch (\Exception $e) {
+                    return redirect()->route('payrolls.automation.last-payroll', ['schedule' => $schedule])
+                        ->with('error', 'Unable to calculate previous payroll period.');
+                }
+            } else {
+                // Legacy PayScheduleSetting system
+                $targetPeriod = $this->calculatePreviousPayPeriod($selectedSchedule);
+                if (!$targetPeriod) {
+                    return redirect()->route('payrolls.automation.last-payroll', ['schedule' => $schedule])
+                        ->with('error', 'No previous payroll period found.');
+                }
+            }
         } else {
-            // Legacy PayScheduleSetting system
-            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+            // Calculate current period (default behavior)
+            if (isset($selectedSchedule->id) && $paySchedule) {
+                // New PaySchedule system
+                $targetPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+            } else {
+                // Legacy PayScheduleSetting system
+                $targetPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+            }
         }
 
-        // Check if a saved payroll exists for this employee and current period
+        // Check if a saved payroll exists for this employee and target period
         $existingPayroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
             $query->where('employee_id', $employee->id);
         })
             ->where('pay_schedule', $schedule)
-            ->where('period_start', $currentPeriod['start'])
-            ->where('period_end', $currentPeriod['end'])
+            ->where('period_start', $targetPeriod['start'])
+            ->where('period_end', $targetPeriod['end'])
             ->where('payroll_type', 'automated')
             ->first();
 
@@ -9375,7 +9508,7 @@ class PayrollController extends Controller
             ]);
         } else {
             // Show draft payroll (dynamic calculations)
-            return $this->showDraftPayrollUnified($schedule, $employee, $currentPeriod);
+            return $this->showDraftPayrollUnified($schedule, $employee, $targetPeriod);
         }
     }
 
@@ -9428,13 +9561,41 @@ class PayrollController extends Controller
                 ->with('error', 'Invalid pay schedule selected.');
         }
 
-        // Use the appropriate period calculation method based on system type
-        if (isset($selectedSchedule->id) && $paySchedule) {
-            // New PaySchedule system
-            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+        // Determine if this is coming from last-payroll context
+        $isLastPayrollContext = $request->get('from_last_payroll', false);
+
+        // Use the appropriate period calculation method based on system type and context
+        if ($isLastPayrollContext) {
+            // Calculate last/previous period instead of current
+            if (isset($selectedSchedule->id) && $paySchedule) {
+                // New PaySchedule system
+                try {
+                    $currentPeriod = $this->calculatePreviousPayPeriodForSchedule($paySchedule);
+                    if (!$currentPeriod) {
+                        return redirect()->route('payrolls.automation.last-payroll', ['schedule' => $schedule])
+                            ->with('error', 'No previous payroll period found.');
+                    }
+                } catch (\Exception $e) {
+                    return redirect()->route('payrolls.automation.last-payroll', ['schedule' => $schedule])
+                        ->with('error', 'Unable to calculate previous payroll period.');
+                }
+            } else {
+                // Legacy PayScheduleSetting system
+                $currentPeriod = $this->calculatePreviousPayPeriod($selectedSchedule);
+                if (!$currentPeriod) {
+                    return redirect()->route('payrolls.automation.last-payroll', ['schedule' => $schedule])
+                        ->with('error', 'No previous payroll period found.');
+                }
+            }
         } else {
-            // Legacy PayScheduleSetting system
-            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+            // Calculate current period (default behavior)
+            if (isset($selectedSchedule->id) && $paySchedule) {
+                // New PaySchedule system
+                $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+            } else {
+                // Legacy PayScheduleSetting system
+                $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+            }
         }
 
         // Check if payroll already exists
@@ -9469,16 +9630,28 @@ class PayrollController extends Controller
             $createdPayroll = $this->autoCreatePayrollForPeriod($scheduleForCreation, $currentPeriod, $employees, 'processing');
 
             // Redirect to payroll ID URL instead of employee ID
-            return redirect()->route('payrolls.automation.show', [
+            $redirectParams = [
                 'schedule' => $schedule,
                 'id' => $createdPayroll->id
-            ])->with('success', 'Payroll processed and saved to database with data snapshot.');
+            ];
+
+            // Preserve the last payroll context parameter
+            if ($isLastPayrollContext) {
+                $redirectParams['from_last_payroll'] = 'true';
+            }
+
+            return redirect()->route('payrolls.automation.show', $redirectParams)
+                ->with('success', 'Payroll processed and saved to database with data snapshot.');
         } catch (\Exception $e) {
             Log::error('Failed to process unified payroll: ' . $e->getMessage());
-            return redirect()->route('payrolls.automation.show', [
-                'schedule' => $schedule,
-                'id' => $employee->id
-            ])->with('error', 'Failed to process payroll: ' . $e->getMessage());
+
+            $redirectParams = ['schedule' => $schedule, 'id' => $employee->id];
+            if ($isLastPayrollContext) {
+                $redirectParams['from_last_payroll'] = 'true';
+            }
+
+            return redirect()->route('payrolls.automation.show', $redirectParams)
+                ->with('error', 'Failed to process payroll: ' . $e->getMessage());
         }
     }
 
@@ -9489,77 +9662,317 @@ class PayrollController extends Controller
     {
         $this->authorize('edit payrolls');
 
-        $employee = Employee::findOrFail($id);
-
-        // Try to find by name first (new system)
-        $paySchedule = PaySchedule::active()
-            ->where('name', $schedule)
+        // First, check if this ID is a payroll ID (for saved/processed payrolls)
+        $payroll = Payroll::with(['payrollDetails.employee'])
+            ->where('id', $id)
             ->first();
 
-        $selectedSchedule = null;
-        if ($paySchedule) {
-            $selectedSchedule = (object) [
-                'code' => $paySchedule->name,
-                'name' => $paySchedule->name,
-                'type' => $paySchedule->type,
-                'id' => $paySchedule->id
+        if ($payroll) {
+            // This is a payroll ID - get the employee and period from the payroll record
+            $firstDetail = $payroll->payrollDetails->first();
+            if (!$firstDetail) {
+                return redirect()->route('payrolls.automation.index')
+                    ->with('error', 'Payroll has no employee details.');
+            }
+
+            $employee = $firstDetail->employee;
+
+            // For payroll IDs, ALWAYS use the payroll's actual period dates
+            // This ensures we delete from the correct period regardless of current/last context
+            $currentPeriod = [
+                'start' => $payroll->period_start,
+                'end' => $payroll->period_end,
+                'pay_date' => $payroll->pay_date
             ];
+
+            // Determine context for redirect purposes only
+            $isLastPayrollContext = $request->get('from_last_payroll', false);
+
+            // If from_last_payroll is not explicitly set, determine context by comparing period dates
+            if (!$request->has('from_last_payroll')) {
+                $paySchedule = PaySchedule::active()->where('name', $schedule)->first();
+                if ($paySchedule) {
+                    $actualCurrentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+                } else {
+                    // Legacy system fallback
+                    $legacySchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                        ->where('code', $schedule)
+                        ->first();
+                    if ($legacySchedule) {
+                        $actualCurrentPeriod = $this->calculateCurrentPayPeriod($legacySchedule);
+                    } else {
+                        $actualCurrentPeriod = null;
+                    }
+                }
+
+                if ($actualCurrentPeriod) {
+                    // Convert to date strings for reliable comparison
+                    $payrollStart = \Carbon\Carbon::parse($payroll->period_start)->format('Y-m-d');
+                    $payrollEnd = \Carbon\Carbon::parse($payroll->period_end)->format('Y-m-d');
+                    $currentStart = \Carbon\Carbon::parse($actualCurrentPeriod['start'])->format('Y-m-d');
+                    $currentEnd = \Carbon\Carbon::parse($actualCurrentPeriod['end'])->format('Y-m-d');
+
+                    // If the payroll's period is different from the current period, it's a last payroll context
+                    $isLastPayrollContext = ($payrollStart !== $currentStart || $payrollEnd !== $currentEnd);
+                }
+            }
+
+            Log::info('BackToUnifiedDraft - Payroll ID context', [
+                'payroll_id' => $payroll->id,
+                'employee_id' => $employee->id,
+                'payroll_period_start' => $payroll->period_start,
+                'payroll_period_end' => $payroll->period_end,
+                'is_last_payroll_context' => $isLastPayrollContext,
+                'from_last_payroll_param' => $request->get('from_last_payroll', false)
+            ]);
         } else {
-            // Legacy system fallback
-            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-                ->where('code', $schedule)
+            // This is an employee ID (for draft payrolls) - use existing logic
+            $employee = Employee::findOrFail($id);
+
+            // Try to find by name first (new system)
+            $paySchedule = PaySchedule::active()
+                ->where('name', $schedule)
                 ->first();
-        }
 
-        if (!$selectedSchedule) {
-            return redirect()->route('payrolls.automation.index')
-                ->with('error', 'Invalid pay schedule selected.');
-        }
+            $selectedSchedule = null;
+            if ($paySchedule) {
+                $selectedSchedule = (object) [
+                    'code' => $paySchedule->name,
+                    'name' => $paySchedule->name,
+                    'type' => $paySchedule->type,
+                    'id' => $paySchedule->id
+                ];
+            } else {
+                // Legacy system fallback
+                $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                    ->where('code', $schedule)
+                    ->first();
+            }
 
-        // Use the appropriate period calculation method based on system type
-        if (isset($selectedSchedule->id) && $paySchedule) {
-            // New PaySchedule system
-            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
-        } else {
-            // Legacy PayScheduleSetting system
-            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+            if (!$selectedSchedule) {
+                return redirect()->route('payrolls.automation.index')
+                    ->with('error', 'Invalid pay schedule selected.');
+            }
+
+            // Determine if this is coming from last-payroll context
+            $isLastPayrollContext = $request->get('from_last_payroll', false);
+
+            // Use the appropriate period calculation method based on system type and context
+            if ($isLastPayrollContext) {
+                // Calculate last/previous period instead of current
+                if (isset($selectedSchedule->id) && $paySchedule) {
+                    // New PaySchedule system
+                    $currentPeriod = $this->calculatePreviousPayPeriodForSchedule($paySchedule);
+                } else {
+                    // Legacy PayScheduleSetting system
+                    $currentPeriod = $this->calculatePreviousPayPeriod($selectedSchedule);
+                }
+            } else {
+                // Calculate current period (default behavior)
+                if (isset($selectedSchedule->id) && $paySchedule) {
+                    // New PaySchedule system
+                    $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+                } else {
+                    // Legacy PayScheduleSetting system
+                    $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+                }
+            }
+
+            Log::info('BackToUnifiedDraft - Calculated period for employee ID context', [
+                'employee_id' => $employee->id,
+                'schedule' => $schedule,
+                'is_last_payroll_context' => $isLastPayrollContext,
+                'calculated_period_start' => $currentPeriod['start'],
+                'calculated_period_end' => $currentPeriod['end']
+            ]);
         }
 
         try {
             DB::beginTransaction();
 
             // Delete payroll and related data
-            $payrolls = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
+            if ($payroll) {
+                // We have a specific payroll ID - search for all payrolls in that period for this employee
+                // This handles both current and last payroll contexts correctly
+                $payrollsToDelete = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
+                    $query->where('employee_id', $employee->id);
+                })
+                    ->where('pay_schedule', $schedule)
+                    ->where('period_start', $currentPeriod['start'])
+                    ->where('period_end', $currentPeriod['end'])
+                    ->where('payroll_type', 'automated')
+                    ->get()
+                    ->filter(function ($payrollToCheck) use ($employee) {
+                        // Additional safety: only delete payrolls that have ONLY this employee
+                        $employeeIds = $payrollToCheck->payrollDetails->pluck('employee_id')->unique();
+
+                        if ($employeeIds->count() === 1 && $employeeIds->first() === $employee->id) {
+                            return true;
+                        }
+
+                        Log::warning('BackToUnifiedDraft - Skipping multi-employee payroll deletion', [
+                            'payroll_id' => $payrollToCheck->id,
+                            'employee_count' => $employeeIds->count(),
+                            'target_employee_id' => $employee->id,
+                            'all_employee_ids' => $employeeIds->toArray()
+                        ]);
+
+                        return false;
+                    });
+
+                Log::info('BackToUnifiedDraft - Deleting payrolls from payroll period', [
+                    'original_payroll_id' => $payroll->id,
+                    'employee_id' => $employee->id,
+                    'period_start' => $currentPeriod['start'],
+                    'period_end' => $currentPeriod['end'],
+                    'found_payrolls_count' => $payrollsToDelete->count(),
+                    'is_last_payroll_context' => $isLastPayrollContext
+                ]);
+            } else {
+                // Find payrolls that specifically belong to this employee for this period
+                // In unified payroll system, each payroll should ideally have only one employee
+                $payrollsToDelete = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
+                    $query->where('employee_id', $employee->id);
+                })
+                    ->where('pay_schedule', $schedule)
+                    ->where('period_start', $currentPeriod['start'])
+                    ->where('period_end', $currentPeriod['end'])
+                    ->where('payroll_type', 'automated')
+                    ->get()
+                    ->filter(function ($payroll) use ($employee) {
+                        // Additional safety: only delete payrolls that have ONLY this employee
+                        // or are specifically meant for this employee (single-employee payrolls)
+                        $employeeIds = $payroll->payrollDetails->pluck('employee_id')->unique();
+
+                        // If this payroll contains only this employee, it's safe to delete
+                        if ($employeeIds->count() === 1 && $employeeIds->first() === $employee->id) {
+                            return true;
+                        }
+
+                        // If this payroll contains multiple employees, we should NOT delete the entire payroll
+                        // Instead, we should only delete the payroll details for this employee
+                        // But for now, we'll log this case and skip deletion to be safe
+                        Log::warning('BackToUnifiedDraft - Skipping multi-employee payroll deletion', [
+                            'payroll_id' => $payroll->id,
+                            'employee_count' => $employeeIds->count(),
+                            'target_employee_id' => $employee->id,
+                            'all_employee_ids' => $employeeIds->toArray()
+                        ]);
+
+                        return false;
+                    });
+
+                Log::info('BackToUnifiedDraft - Deleting payrolls by period', [
+                    'employee_id' => $employee->id,
+                    'schedule' => $schedule,
+                    'period_start' => $currentPeriod['start'],
+                    'period_end' => $currentPeriod['end'],
+                    'found_payrolls_count' => $payrollsToDelete->count(),
+                    'is_last_payroll_context' => $isLastPayrollContext
+                ]);
+            }
+
+            // Handle multi-employee payrolls separately
+            $multiEmployeePayrolls = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
                 $query->where('employee_id', $employee->id);
             })
                 ->where('pay_schedule', $schedule)
                 ->where('period_start', $currentPeriod['start'])
                 ->where('period_end', $currentPeriod['end'])
                 ->where('payroll_type', 'automated')
+                ->whereNotIn('id', $payrollsToDelete->pluck('id'))
                 ->get();
 
-            foreach ($payrolls as $payroll) {
+            // Delete single-employee payrolls completely
+            foreach ($payrollsToDelete as $payrollToDelete) {
                 // Delete snapshots
-                $payroll->snapshots()->delete();
+                $payrollToDelete->snapshots()->delete();
                 // Delete payroll details
-                $payroll->payrollDetails()->delete();
+                $payrollToDelete->payrollDetails()->delete();
                 // Delete payroll
-                $payroll->delete();
+                $payrollToDelete->delete();
+            }
+
+            // For multi-employee payrolls, only delete the specific employee's details
+            foreach ($multiEmployeePayrolls as $multiPayroll) {
+                Log::info('BackToUnifiedDraft - Handling multi-employee payroll', [
+                    'payroll_id' => $multiPayroll->id,
+                    'employee_id' => $employee->id,
+                    'total_employee_count' => $multiPayroll->payrollDetails->count()
+                ]);
+
+                // Delete only this employee's payroll details
+                $multiPayroll->payrollDetails()->where('employee_id', $employee->id)->delete();
+
+                // Delete snapshots for this employee in this payroll
+                $multiPayroll->snapshots()->where('employee_id', $employee->id)->delete();
+
+                // Check if this payroll now has no employees left
+                $remainingEmployees = $multiPayroll->payrollDetails()->count();
+                if ($remainingEmployees === 0) {
+                    Log::info('BackToUnifiedDraft - Multi-employee payroll now empty, deleting', [
+                        'payroll_id' => $multiPayroll->id
+                    ]);
+                    // Delete any remaining snapshots and the payroll itself
+                    $multiPayroll->snapshots()->delete();
+                    $multiPayroll->delete();
+                } else {
+                    Log::info('BackToUnifiedDraft - Multi-employee payroll still has employees', [
+                        'payroll_id' => $multiPayroll->id,
+                        'remaining_employees' => $remainingEmployees
+                    ]);
+                }
             }
 
             DB::commit();
 
-            return redirect()->route('payrolls.automation.show', [
+            Log::info('BackToUnifiedDraft - Successful deletion and redirect', [
+                'employee_id' => $employee->id,
                 'schedule' => $schedule,
-                'id' => $employee->id
-            ])->with('success', 'Successfully deleted saved payroll. Returned to draft mode.');
+                'is_last_payroll_context' => $isLastPayrollContext,
+                'deleted_single_employee_payrolls' => $payrollsToDelete->count(),
+                'processed_multi_employee_payrolls' => $multiEmployeePayrolls->count()
+            ]);
+
+            // Determine the correct route based on context
+            if ($isLastPayrollContext) {
+                // For last payroll context, redirect to the regular route with from_last_payroll parameter
+                return redirect()->route('payrolls.automation.show', [
+                    'schedule' => $schedule,
+                    'id' => $employee->id,
+                    'from_last_payroll' => 'true'
+                ])->with('success', 'Successfully deleted saved payroll. Returned to draft mode.');
+            } else {
+                // For current payroll context, use the regular route
+                return redirect()->route('payrolls.automation.show', [
+                    'schedule' => $schedule,
+                    'id' => $employee->id
+                ])->with('success', 'Successfully deleted saved payroll. Returned to draft mode.');
+            }
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to return unified payroll to draft: ' . $e->getMessage());
-            return redirect()->route('payrolls.automation.show', [
+
+            Log::info('BackToUnifiedDraft - Error redirect', [
+                'employee_id' => $employee->id,
                 'schedule' => $schedule,
-                'id' => $employee->id
-            ])->with('error', 'Failed to return to draft: ' . $e->getMessage());
+                'is_last_payroll_context' => $isLastPayrollContext,
+                'error' => $e->getMessage()
+            ]);
+
+            // Determine the correct error redirect route based on context
+            if ($isLastPayrollContext) {
+                return redirect()->route('payrolls.automation.show', [
+                    'schedule' => $schedule,
+                    'id' => $employee->id,
+                    'from_last_payroll' => 'true'
+                ])->with('error', 'Failed to return to draft: ' . $e->getMessage());
+            } else {
+                return redirect()->route('payrolls.automation.show', [
+                    'schedule' => $schedule,
+                    'id' => $employee->id
+                ])->with('error', 'Failed to return to draft: ' . $e->getMessage());
+            }
         }
     }
 
@@ -9570,57 +9983,93 @@ class PayrollController extends Controller
     {
         $this->authorize('approve payrolls');
 
-        $employee = Employee::findOrFail($id);
-
-        // Try to find by name first (new system)
-        $paySchedule = PaySchedule::active()
-            ->where('name', $schedule)
+        // First, check if this ID is a payroll ID (for saved/processed payrolls)
+        $existingPayroll = Payroll::with(['payrollDetails.employee'])
+            ->where('id', $id)
             ->first();
 
-        $selectedSchedule = null;
-        if ($paySchedule) {
-            $selectedSchedule = (object) [
-                'code' => $paySchedule->name,
-                'name' => $paySchedule->name,
-                'type' => $paySchedule->type,
-                'id' => $paySchedule->id
-            ];
+        if ($existingPayroll) {
+            // This is a payroll ID - get the employee from the payroll record
+            $firstDetail = $existingPayroll->payrollDetails->first();
+            if (!$firstDetail) {
+                return redirect()->route('payrolls.automation.index')
+                    ->with('error', 'Payroll has no employee details.');
+            }
+
+            $employee = $firstDetail->employee;
+            $payroll = $existingPayroll;
         } else {
-            // Legacy system fallback
-            $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
-                ->where('code', $schedule)
+            // This is an employee ID - find the payroll for this employee
+            $employee = Employee::findOrFail($id);
+
+            // Try to find by name first (new system)
+            $paySchedule = PaySchedule::active()
+                ->where('name', $schedule)
+                ->first();
+
+            $selectedSchedule = null;
+            if ($paySchedule) {
+                $selectedSchedule = (object) [
+                    'code' => $paySchedule->name,
+                    'name' => $paySchedule->name,
+                    'type' => $paySchedule->type,
+                    'id' => $paySchedule->id
+                ];
+            } else {
+                // Legacy system fallback
+                $selectedSchedule = \App\Models\PayScheduleSetting::systemDefaults()
+                    ->where('code', $schedule)
+                    ->first();
+            }
+
+            if (!$selectedSchedule) {
+                return redirect()->route('payrolls.automation.index')
+                    ->with('error', 'Invalid pay schedule selected.');
+            }
+
+            // Determine if this is coming from last-payroll context
+            $isLastPayrollContext = $request->get('from_last_payroll', false);
+
+            // Use the appropriate period calculation method based on system type and context
+            if ($isLastPayrollContext) {
+                // Calculate last/previous period instead of current
+                if (isset($selectedSchedule->id) && $paySchedule) {
+                    // New PaySchedule system
+                    $currentPeriod = $this->calculatePreviousPayPeriodForSchedule($paySchedule);
+                } else {
+                    // Legacy PayScheduleSetting system
+                    $currentPeriod = $this->calculatePreviousPayPeriod($selectedSchedule);
+                }
+            } else {
+                // Calculate current period (default behavior)
+                if (isset($selectedSchedule->id) && $paySchedule) {
+                    // New PaySchedule system
+                    $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
+                } else {
+                    // Legacy PayScheduleSetting system
+                    $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
+                }
+            }
+
+            // Find existing payroll
+            $payroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
+                $query->where('employee_id', $employee->id);
+            })
+                ->where('pay_schedule', $schedule)
+                ->where('period_start', $currentPeriod['start'])
+                ->where('period_end', $currentPeriod['end'])
+                ->where('payroll_type', 'automated')
                 ->first();
         }
 
-        if (!$selectedSchedule) {
-            return redirect()->route('payrolls.automation.index')
-                ->with('error', 'Invalid pay schedule selected.');
-        }
-
-        // Use the appropriate period calculation method based on system type
-        if (isset($selectedSchedule->id) && $paySchedule) {
-            // New PaySchedule system
-            $currentPeriod = $this->calculateCurrentPayPeriodForSchedule($paySchedule);
-        } else {
-            // Legacy PayScheduleSetting system
-            $currentPeriod = $this->calculateCurrentPayPeriod($selectedSchedule);
-        }
-
-        // Find existing payroll
-        $payroll = Payroll::whereHas('payrollDetails', function ($query) use ($employee) {
-            $query->where('employee_id', $employee->id);
-        })
-            ->where('pay_schedule', $schedule)
-            ->where('period_start', $currentPeriod['start'])
-            ->where('period_end', $currentPeriod['end'])
-            ->where('payroll_type', 'automated')
-            ->first();
-
         if (!$payroll) {
-            return redirect()->route('payrolls.automation.show', [
-                'schedule' => $schedule,
-                'id' => $employee->id
-            ])->with('error', 'No payroll found to approve.');
+            $redirectParams = ['schedule' => $schedule, 'id' => $employee->id];
+            if (isset($isLastPayrollContext) && $isLastPayrollContext) {
+                $redirectParams['from_last_payroll'] = 'true';
+            }
+
+            return redirect()->route('payrolls.automation.show', $redirectParams)
+                ->with('error', 'No payroll found to approve.');
         }
 
         try {
@@ -10001,9 +10450,15 @@ class PayrollController extends Controller
      */
     private function showSavedPayroll($payroll, $schedule, $employeeId)
     {
+        // Ensure payroll has correct schedule context for display
+        // The URL schedule parameter should match the payroll's pay_schedule
+        $payroll->pay_schedule = $schedule;
+
         return $this->showPayrollWithAdditionalData($payroll, [
             'schedule' => $schedule,
-            'employee' => $employeeId
+            'employee' => $employeeId,
+            'selectedSchedule' => $schedule,
+            'scheduleCode' => $schedule
         ]);
     }
 

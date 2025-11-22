@@ -41,8 +41,8 @@
                     <div class="flex justify-center">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
                         @forelse($schedules as $schedule)
-                            <a href="{{ route('payrolls.automation.list', ['schedule' => $schedule->name]) }}" 
-                               class="block border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-lg hover:bg-blue-50 transition-all duration-200 cursor-pointer transform hover:scale-105 h-80 min-h-80 max-h-80 w-full">
+                            <div onclick="window.location.href='{{ route('payrolls.automation.list', ['schedule' => $schedule->name]) }}'" 
+                                 class="block border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-lg hover:bg-blue-50 transition-all duration-200 cursor-pointer transform hover:scale-105 h-80 min-h-80 max-h-80 w-full">
                                 <div class="py-6 px-8 h-full flex flex-col">
                                     <div class="flex items-center justify-between mb-4">
                                         <h4 class="text-lg font-semibold text-gray-900">{{ $schedule->name }}</h4>
@@ -70,7 +70,12 @@
                                                 <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path>
                                                 </svg>
-                                                Last payroll: {{ $schedule->last_payroll_period }}
+                                                Last payroll: 
+                                                <a href="{{ route('payrolls.automation.last-payroll', ['schedule' => $schedule->name]) }}" 
+                                                   class="text-blue-600 hover:text-blue-800 hover:underline font-medium ml-1"
+                                                   onclick="event.stopPropagation();">
+                                                    {{ $schedule->last_payroll_period }}
+                                                </a>
                                             </div>
                                         @else
                                             <div class="flex items-center text-sm text-gray-500">
@@ -136,7 +141,7 @@
                                         </div>
                                     </div>
                                 </div>
-                            </a>
+                            </div>
                         @empty
                             <div class="col-span-full text-center py-8">
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">

@@ -6,7 +6,11 @@
                     Payroll Details: {{ $payroll->payroll_number }}
                 </h2>
                 <p class="text-sm text-gray-600 mt-1">
-                    {{ $payroll->period_start->format('M d') }} - {{ $payroll->period_end->format('M d, Y') }}
+                    @if($payroll->period_start && $payroll->period_end)
+                        {{ $payroll->period_start->format('M d') }} - {{ $payroll->period_end->format('M d, Y') }}
+                    @else
+                        Period not set
+                    @endif
                 </p>
             </div>
             <div class="flex space-x-2">
@@ -518,11 +522,23 @@
                         </div>
                         <div class="flex-1">
                             <h4 class="text-sm font-medium text-gray-900">Payroll Period</h4>
-                            <p class="mt-1 text-sm text-gray-600">{{ $payroll->period_start->format('M d') }} - {{ $payroll->period_end->format('M d, Y') }}</p>
+                            <p class="mt-1 text-sm text-gray-600">
+                                @if($payroll->period_start && $payroll->period_end)
+                                    {{ $payroll->period_start->format('M d') }} - {{ $payroll->period_end->format('M d, Y') }}
+                                @else
+                                    Not set
+                                @endif
+                            </p>
                         </div>
                         <div class="flex-1">
                             <h4 class="text-sm font-medium text-gray-900">Pay Date</h4>
-                            <p class="mt-1 text-sm text-gray-600">{{ $payroll->pay_date->format('M d, Y') }}</p>
+                            <p class="mt-1 text-sm text-gray-600">
+                                @if($payroll->pay_date)
+                                    {{ $payroll->pay_date->format('M d, Y') }}
+                                @else
+                                    Not set
+                                @endif
+                            </p>
                         </div>
                         <div class="flex-1">
                             <h4 class="text-sm font-medium text-gray-900">Monthly Basic Pay</h4>
@@ -564,7 +580,7 @@
                                 @if($payroll->markedPaidBy)
                                 <p class="text-sm text-green-700 mt-1 ">
                                     <span class="font-medium">Marked by:</span>
-                                    {{ $payroll->markedPaidBy->name }} on {{ $payroll->marked_paid_at->format('M d, Y g:i A') }}
+                                    {{ $payroll->markedPaidBy->name }}@if($payroll->marked_paid_at) on {{ $payroll->marked_paid_at->format('M d, Y g:i A') }}@endif
                                 </p>
                                 @endif
                             </div>
@@ -610,12 +626,12 @@
                     <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">Created By</h4>
-                            <p class="mt-1 text-sm text-gray-600">{{ $payroll->creator->name }} on {{ $payroll->created_at->format('M d, Y g:i A') }}</p>
+                            <p class="mt-1 text-sm text-gray-600">{{ $payroll->creator->name }}@if($payroll->created_at) on {{ $payroll->created_at->format('M d, Y g:i A') }}@endif</p>
                         </div>
                         @if($payroll->approver)
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">Approved By</h4>
-                            <p class="mt-1 text-sm text-gray-600">{{ $payroll->approver->name }} on {{ $payroll->approved_at->format('M d, Y g:i A') }}</p>
+                            <p class="mt-1 text-sm text-gray-600">{{ $payroll->approver->name }}@if($payroll->approved_at) on {{ $payroll->approved_at->format('M d, Y g:i A') }}@endif</p>
                         </div>
                         @endif
                     </div> --}}
@@ -628,6 +644,9 @@
                         {{-- Automation payroll - use unified process route --}}
                         <form method="POST" action="{{ route('payrolls.automation.process', ['schedule' => $schedule, 'id' => $employee]) }}" class="inline">
                             @csrf
+                            @if(request()->get('from_last_payroll'))
+                                <input type="hidden" name="from_last_payroll" value="true">
+                            @endif
                             <button type="submit" 
                                     class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 focus:bg-green-700 active:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150"
                                     onclick="return confirm('Submit this payroll for processing? This will save it to the database with locked data snapshots.')">
@@ -666,6 +685,9 @@
                         {{-- Automation payroll - use unified approve route --}}
                         <form method="POST" action="{{ route('payrolls.automation.approve', ['schedule' => $schedule, 'id' => $employee]) }}" class="inline">
                             @csrf
+                            @if(request()->get('from_last_payroll'))
+                                <input type="hidden" name="from_last_payroll" value="true">
+                            @endif
                             <button type="submit"
                                     class="inline-flex items-center px-4 py-2 bg-purple-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-purple-700 focus:bg-purple-700 active:bg-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition ease-in-out duration-150"
                                     onclick="return confirm('Approve this payroll?')">
@@ -692,6 +714,9 @@
                         {{-- Automation payroll - use unified back-to-draft route --}}
                         <form method="POST" action="{{ route('payrolls.automation.back-to-draft', ['schedule' => $schedule, 'id' => $employee]) }}" class="inline">
                             @csrf
+                            @if(request()->get('from_last_payroll'))
+                                <input type="hidden" name="from_last_payroll" value="true">
+                            @endif
                             <button type="submit"
                                     class="inline-flex items-center px-4 py-2 bg-yellow-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-yellow-700 focus:bg-yellow-700 active:bg-yellow-900 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 transition ease-in-out duration-150"
                                     onclick="return confirm('Move this payroll back to draft? This will delete the saved payroll and return to dynamic calculations.')">
@@ -3333,7 +3358,12 @@
                 <div class="p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-medium text-gray-900">
-                            DTR Summary: {{ \Carbon\Carbon::parse($payroll->period_start)->format('M d') }} - {{ \Carbon\Carbon::parse($payroll->period_end)->format('M d, Y') }}
+                            DTR Summary: 
+                            @if($payroll->period_start && $payroll->period_end)
+                                {{ \Carbon\Carbon::parse($payroll->period_start)->format('M d') }} - {{ \Carbon\Carbon::parse($payroll->period_end)->format('M d, Y') }}
+                            @else
+                                Period not set
+                            @endif
                         </h3>
                         <div class="flex space-x-2">
                             @can('create time logs')
@@ -3354,10 +3384,10 @@
                                 @elseif($payroll->payrollDetails->isNotEmpty() && $payroll->status === 'draft')
                                     <a href="{{ route('time-logs.create-bulk-employee', array_merge([
                                         'employee_id' => $payroll->payrollDetails->first()->employee_id,
-                                        'period_start' => $payroll->period_start->format('Y-m-d'),
-                                        'period_end' => $payroll->period_end->format('Y-m-d'),
+                                        'period_start' => $payroll->period_start ? $payroll->period_start->format('Y-m-d') : '',
+                                        'period_end' => $payroll->period_end ? $payroll->period_end->format('Y-m-d') : '',
                                         'payroll_id' => $payroll->id
-                                    ], isset($schedule) ? ['schedule' => $schedule] : [])) }}" 
+                                    ], isset($schedule) ? ['schedule' => $schedule] : [], request()->get('from_last_payroll') ? ['from_last_payroll' => 'true'] : [])) }}" 
                                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm flex items-center">
                                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>

@@ -1635,10 +1635,18 @@ class TimeLogController extends Controller
 
                 // Check if we have schedule parameter for automation routes
                 if ($request->filled('schedule')) {
-                    return redirect()->route('payrolls.automation.show', [
+                    $redirectParams = [
                         'schedule' => $request->schedule,
                         'id' => $validated['employee_id']
-                    ])->with('success', $message . ' Payroll calculations updated.');
+                    ];
+
+                    // Preserve from_last_payroll parameter if present
+                    if ($request->filled('from_last_payroll')) {
+                        $redirectParams['from_last_payroll'] = 'true';
+                    }
+
+                    return redirect()->route('payrolls.automation.show', $redirectParams)
+                        ->with('success', $message . ' Payroll calculations updated.');
                 } else {
                     // Fallback to traditional payroll route
                     return redirect()->route('payrolls.show', $request->payroll_id)

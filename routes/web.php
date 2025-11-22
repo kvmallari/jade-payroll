@@ -126,11 +126,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Automated Payroll - schedule selection and auto-creation for active employees
         Route::get('payrolls/automation', [PayrollController::class, 'automationIndex'])->name('payrolls.automation.index');
         Route::get('payrolls/automation/{frequency}', [PayrollController::class, 'automationSchedules'])->name('payrolls.automation.schedules')->where('frequency', 'weekly|semi_monthly|monthly|daily');
-        Route::get('payrolls/automation/{schedule}/{period}', [PayrollController::class, 'automationPeriodList'])->name('payrolls.automation.period')->where(['schedule' => '[A-Za-z0-9_-]+', 'period' => '1st|2nd|current']);
-        Route::get('payrolls/automation/{schedule}/{period}/{id}', [PayrollController::class, 'showPeriodSpecificPayroll'])->name('payrolls.automation.period.show')->where(['schedule' => '[A-Za-z0-9_\-]+', 'period' => '1st|2nd|current', 'id' => '[0-9]+']);
+        Route::get('payrolls/automation/{schedule}/{period}', [PayrollController::class, 'automationPeriodList'])->name('payrolls.automation.period')->where(['schedule' => '[A-Za-z0-9_-]+', 'period' => '1st|2nd|current|last']);
+        Route::get('payrolls/automation/{schedule}/{period}/{id}', [PayrollController::class, 'showPeriodSpecificPayroll'])->name('payrolls.automation.period.show')->where(['schedule' => '[A-Za-z0-9_\-]+', 'period' => '1st|2nd|current|last', 'id' => '[0-9]+']);
         Route::get('payrolls/automation/create', [PayrollController::class, 'automationCreate'])->name('payrolls.automation.create');
         Route::post('payrolls/automation/store', [PayrollController::class, 'automationStore'])->name('payrolls.automation.store');
         Route::post('payrolls/automation/{schedule}/submit', [PayrollController::class, 'automationSubmit'])->name('payrolls.automation.submit')->where('schedule', '[A-Za-z0-9_\-]+');
+        Route::get('payrolls/automation/{schedule}/last-payroll', [PayrollController::class, 'automationLastPayroll'])->name('payrolls.automation.last-payroll')->where('schedule', '[A-Za-z0-9_\-]+');
         Route::get('payrolls/automation/{schedule}', [PayrollController::class, 'automationList'])->name('payrolls.automation.list')->where('schedule', '[A-Za-z0-9_\-]+');
 
         // Unified Payroll Routes - for individual employee automation payrolls
