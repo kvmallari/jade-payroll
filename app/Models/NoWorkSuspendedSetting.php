@@ -10,6 +10,7 @@ class NoWorkSuspendedSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',
@@ -32,6 +33,14 @@ class NoWorkSuspendedSetting extends Model
         'time_to' => 'datetime:H:i',
         'is_paid' => 'boolean',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Scope to get only active records

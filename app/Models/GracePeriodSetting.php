@@ -10,6 +10,7 @@ class GracePeriodSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'late_grace_minutes',
         'undertime_grace_minutes',
         'overtime_threshold_minutes',
@@ -22,6 +23,14 @@ class GracePeriodSetting extends Model
         'overtime_threshold_minutes' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Get the current active grace period settings (always ID 1)

@@ -13,6 +13,7 @@ class Employee extends Model
 
     protected $fillable = [
         'user_id',
+        'company_id',
         'department_id',
         'position_id',
         'employee_number',
@@ -98,6 +99,14 @@ class Employee extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the company that the employee belongs to.
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     /**

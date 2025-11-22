@@ -10,6 +10,7 @@ class PayScheduleSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',
@@ -33,6 +34,14 @@ class PayScheduleSetting extends Model
         'is_active' => 'boolean',
         'is_system_default' => 'boolean',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Get employees using this pay schedule

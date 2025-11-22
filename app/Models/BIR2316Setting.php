@@ -9,6 +9,7 @@ class BIR2316Setting extends Model
     protected $table = 'bir2316_settings';
 
     protected $fillable = [
+        'company_id',
         'tax_year',
         'statutory_minimum_wage_per_day',
         'statutory_minimum_wage_per_month',
@@ -30,6 +31,14 @@ class BIR2316Setting extends Model
         'date_signed_by_employee' => 'date',
         'date_issued' => 'date',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Get settings for a specific tax year

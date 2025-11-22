@@ -6,12 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\AllowanceBonusSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 
 class AllowanceBonusSettingController extends Controller
 {
     public function index()
     {
-        $settings = AllowanceBonusSetting::orderBy('type')
+        $user = Auth::user();
+
+        $settings = AllowanceBonusSetting::query()
+            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
+                $query->where('company_id', $user->company_id);
+            })
+            ->orderBy('type')
             ->orderBy('sort_order')
             ->get()
             ->groupBy('type');
@@ -65,6 +72,9 @@ class AllowanceBonusSettingController extends Controller
         }
 
         $validated['code'] = $code;
+
+        // Add company_id from logged in user
+        $validated['company_id'] = Auth::user()->company_id;
 
         AllowanceBonusSetting::create($validated);
 

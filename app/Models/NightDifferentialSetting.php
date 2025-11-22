@@ -10,6 +10,7 @@ class NightDifferentialSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'start_time',
         'end_time',
         'rate_multiplier',
@@ -21,6 +22,14 @@ class NightDifferentialSetting extends Model
         'rate_multiplier' => 'decimal:4',
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Get the current active night differential setting

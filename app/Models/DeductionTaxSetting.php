@@ -11,6 +11,7 @@ class DeductionTaxSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',
@@ -83,6 +84,14 @@ class DeductionTaxSetting extends Model
         'enable_proration' => 'boolean',
         'deduct_on_monthly_payroll' => 'boolean',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Scope to get only active deductions

@@ -36,6 +36,14 @@ class RoleAndPermissionSeeder extends Seeder
             'delete users',
             'assign roles',
 
+            // Company Management
+            'view companies',
+            'create companies',
+            'edit companies',
+            'delete companies',
+            'view all companies',
+            'manage all users',
+
             // Payroll Management
             'view payrolls',
             'create payrolls',
@@ -158,9 +166,19 @@ class RoleAndPermissionSeeder extends Seeder
 
         // Create roles and assign permissions
 
-        // System Administrator - Full access
+        // Super Admin - ABSOLUTE FULL ACCESS TO EVERYTHING
+        $superAdmin = Role::firstOrCreate(['name' => 'Super Admin']);
+        $superAdmin->syncPermissions(Permission::all());
+
+        // System Administrator - Full access EXCEPT company creation and viewing all users across companies
         $systemAdmin = Role::firstOrCreate(['name' => 'System Administrator']);
-        $systemAdmin->syncPermissions(Permission::all());
+        $systemAdminPermissions = Permission::whereNotIn('name', [
+            'view all companies',
+            'create companies',
+            'delete companies',
+            'manage all users',
+        ])->pluck('name')->toArray();
+        $systemAdmin->syncPermissions($systemAdminPermissions);
 
         // HR Head - Full access to employees, deductions, holidays, approvals, settings
         $hrHead = Role::firstOrCreate(['name' => 'HR Head']);

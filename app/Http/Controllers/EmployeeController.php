@@ -27,7 +27,18 @@ class EmployeeController extends Controller
     {
         $this->authorize('view employees');
 
-        $query = Employee::with(['user', 'department', 'position']);
+        $query = Employee::with(['user', 'department', 'position', 'company']);
+
+        // Apply company scope - HR Head and HR Staff can only see their company's employees
+        $user = Auth::user();
+        if (!$user->isSuperAdmin()) {
+            $query->where('company_id', $user->company_id);
+        } else {
+            // For System Administrator, apply company filter if provided
+            if ($request->filled('company')) {
+                $query->where('company_id', $request->company);
+            }
+        }
 
         // Apply filters
         if ($request->filled('search')) {
@@ -72,6 +83,12 @@ class EmployeeController extends Controller
         $perPage = $request->get('per_page', 10);
         $employees = $query->paginate($perPage)->withQueryString();
         $departments = Department::active()->get();
+
+        // Get companies for filter (only for System Administrator)
+        $companies = [];
+        if ($user->isSuperAdmin()) {
+            $companies = \App\Models\Company::where('is_active', true)->orderBy('name')->get();
+        }
 
         // Get performance data for current month (based on DTR)
         $currentMonth = \Carbon\Carbon::now();
@@ -182,6 +199,7 @@ class EmployeeController extends Controller
             return response()->json([
                 'employees' => $employees,
                 'departments' => $departments,
+                'companies' => $companies,
                 'topPerformers' => $topPerformers,
                 'leastPerformers' => $leastPerformers,
                 'currentMonth' => $currentMonth,
@@ -191,7 +209,7 @@ class EmployeeController extends Controller
             ]);
         }
 
-        return view('employees.index', compact('employees', 'departments', 'topPerformers', 'leastPerformers', 'currentMonth', 'summaryStats'));
+        return view('employees.index', compact('employees', 'departments', 'companies', 'topPerformers', 'leastPerformers', 'currentMonth', 'summaryStats'));
     }
 
     /**
@@ -308,12 +326,16 @@ class EmployeeController extends Controller
 
             $userStatus = $userStatusMap[$validated['employment_status']] ?? 'active';
 
+            // Get company_id from the logged-in user (HR Head/Staff inherit their company)
+            $companyId = Auth::user()->company_id;
+
             // Create user account
             $user = User::create([
                 'name' => trim("{$validated['first_name']} {$validated['last_name']}"),
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['employee_number']), // Use employee number as default password
                 'employee_id' => $validated['employee_number'],
+                'company_id' => $companyId,
                 'status' => $userStatus,
                 'email_verified_at' => now(),
             ]);
@@ -324,6 +346,7 @@ class EmployeeController extends Controller
             // Create employee record
             $employeeData = collect($validated)->except(['email', 'role'])->toArray();
             $employeeData['user_id'] = $user->id;
+            $employeeData['company_id'] = $companyId;
 
             // Set paid_leaves to null if benefits_status is without_benefits and paid_leaves is empty
             if ($employeeData['benefits_status'] === 'without_benefits' && empty($employeeData['paid_leaves'])) {

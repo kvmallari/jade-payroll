@@ -27,6 +27,7 @@ class User extends Authenticatable
         'employee_id',
         'status',
         'role',
+        'company_id',
     ];
 
     /**
@@ -73,6 +74,7 @@ class User extends Authenticatable
 
         // Map role field to Spatie role names
         $roleMapping = [
+            'super_admin' => 'Super Admin',
             'system_admin' => 'System Administrator',
             'hr_head' => 'HR Head',
             'hr_staff' => 'HR Staff',
@@ -104,5 +106,29 @@ class User extends Authenticatable
     public function employee()
     {
         return $this->hasOne(Employee::class);
+    }
+
+    /**
+     * Get the company that owns the user.
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Check if user is a super admin (can see all companies)
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('Super Admin');
+    }
+
+    /**
+     * Check if user is a system admin (admin for a specific company or super admin)
+     */
+    public function isSystemAdmin(): bool
+    {
+        return $this->hasRole(['Super Admin', 'System Administrator']);
     }
 }

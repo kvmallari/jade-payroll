@@ -10,6 +10,7 @@ class PaidLeaveSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',
@@ -62,6 +63,14 @@ class PaidLeaveSetting extends Model
         'is_active' => 'boolean',
         'is_system_default' => 'boolean',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Scope to get only active leave settings

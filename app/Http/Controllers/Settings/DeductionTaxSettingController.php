@@ -9,12 +9,19 @@ use App\Models\SssTaxTable;
 use App\Models\PagibigTaxTable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class DeductionTaxSettingController extends Controller
 {
     public function index()
     {
-        $deductions = DeductionTaxSetting::orderBy('type')
+        $user = Auth::user();
+
+        $deductions = DeductionTaxSetting::query()
+            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
+                $query->where('company_id', $user->company_id);
+            })
+            ->orderBy('type')
             ->orderBy('sort_order')
             ->get()
             ->groupBy('type');
@@ -85,6 +92,9 @@ class DeductionTaxSettingController extends Controller
         if (isset($validated['distribution_method']) && $validated['distribution_method'] === '') {
             $validated['distribution_method'] = null;
         }
+
+        // Add company_id from logged in user
+        $validated['company_id'] = Auth::user()->company_id;
 
         DeductionTaxSetting::create($validated);
 

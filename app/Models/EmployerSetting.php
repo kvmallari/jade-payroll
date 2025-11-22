@@ -10,6 +10,7 @@ class EmployerSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'registered_business_name',
         'tax_identification_number',
         'rdo_code',
@@ -23,6 +24,14 @@ class EmployerSetting extends Model
         'signatory_name',
         'signatory_designation',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Get the singleton instance of employer settings

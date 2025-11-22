@@ -451,13 +451,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Leave Requests
     Route::middleware('can:view own leave requests')->group(function () {});
 
-    // User Management (System Administrator only)
-    Route::middleware('role:System Administrator')->group(function () {
+    // User Management (Super Admin and System Administrator)
+    Route::middleware('role:Super Admin|System Administrator')->group(function () {
         // User summary generation
         Route::post('users/generate-summary', [\App\Http\Controllers\UserController::class, 'generateSummary'])
             ->name('users.generate-summary');
 
         Route::resource('users', \App\Http\Controllers\UserController::class);
+
+        // Company Management (Super Admin only)
+        Route::middleware('role:Super Admin')->group(function () {
+            Route::post('companies/{company}/toggle', [\App\Http\Controllers\CompanyController::class, 'toggle'])
+                ->name('companies.toggle');
+            Route::resource('companies', \App\Http\Controllers\CompanyController::class);
+        });
     });
 });
 

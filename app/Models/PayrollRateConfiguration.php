@@ -10,6 +10,7 @@ class PayrollRateConfiguration extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'type_name',
         'display_name',
         'regular_rate_multiplier',

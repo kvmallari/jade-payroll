@@ -55,36 +55,55 @@ class DashboardController extends Controller
     {
         $currentMonth = Carbon::now();
         $lastMonth = Carbon::now()->subMonth();
+        $user = Auth::user();
+
+        // Determine company scope
+        $employeeQuery = Employee::query();
+        $payrollQuery = Payroll::query();
+        $cashAdvanceQuery = CashAdvance::query();
+
+        // Apply company scoping - only Super Admin sees all
+        if (!$user->isSuperAdmin()) {
+            $companyId = $user->company_id;
+            $employeeQuery->where('company_id', $companyId);
+            // Payroll and CashAdvance will be scoped via employee relationship
+            $payrollQuery->whereHas('payrollDetails.employee', function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            });
+            $cashAdvanceQuery->whereHas('employee', function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            });
+        }
 
         // Employee Statistics - All Status Types
-        $totalEmployees = Employee::count();
-        $activeEmployees = Employee::where('employment_status', 'active')->count();
-        $inactiveEmployees = Employee::where('employment_status', 'inactive')->count();
-        $terminatedEmployees = Employee::where('employment_status', 'terminated')->count();
-        $resignedEmployees = Employee::where('employment_status', 'resigned')->count();
-        $newEmployeesThisMonth = Employee::whereMonth('hire_date', $currentMonth->month)
+        $totalEmployees = (clone $employeeQuery)->count();
+        $activeEmployees = (clone $employeeQuery)->where('employment_status', 'active')->count();
+        $inactiveEmployees = (clone $employeeQuery)->where('employment_status', 'inactive')->count();
+        $terminatedEmployees = (clone $employeeQuery)->where('employment_status', 'terminated')->count();
+        $resignedEmployees = (clone $employeeQuery)->where('employment_status', 'resigned')->count();
+        $newEmployeesThisMonth = (clone $employeeQuery)->whereMonth('hire_date', $currentMonth->month)
             ->whereYear('hire_date', $currentMonth->year)
             ->count();
-        $newEmployeesLastMonth = Employee::whereMonth('hire_date', $lastMonth->month)
+        $newEmployeesLastMonth = (clone $employeeQuery)->whereMonth('hire_date', $lastMonth->month)
             ->whereYear('hire_date', $lastMonth->year)
             ->count();
 
         // Payroll Statistics - All Status Types
-        $totalPayrolls = Payroll::count();
-        $draftPayrolls = Payroll::where('status', 'draft')->count();
-        $processingPayrolls = Payroll::where('status', 'processing')->count();
-        $approvedPayrolls = Payroll::where('status', 'approved')->count();
-        $paidPayrolls = Payroll::where('is_paid', true)->count();
-        $totalPayrollAmount = Payroll::where('is_paid', true)->sum('total_gross');
+        $totalPayrolls = (clone $payrollQuery)->count();
+        $draftPayrolls = (clone $payrollQuery)->where('status', 'draft')->count();
+        $processingPayrolls = (clone $payrollQuery)->where('status', 'processing')->count();
+        $approvedPayrolls = (clone $payrollQuery)->where('status', 'approved')->count();
+        $paidPayrolls = (clone $payrollQuery)->where('is_paid', true)->count();
+        $totalPayrollAmount = (clone $payrollQuery)->where('is_paid', true)->sum('total_gross');
 
         // Cash Advance Statistics - All Status Types
-        $totalCashAdvances = CashAdvance::count();
-        $pendingCashAdvances = CashAdvance::where('status', 'pending')->count();
-        $approvedCashAdvances = CashAdvance::where('status', 'approved')->count();
-        $rejectedCashAdvances = CashAdvance::where('status', 'rejected')->count();
-        $completedCashAdvances = CashAdvance::where('status', 'completed')->count();
-        $totalCashAdvanceAmount = CashAdvance::where('status', 'approved')->sum('approved_amount');
-        $outstandingCashAdvances = CashAdvance::where('status', 'approved')->sum('outstanding_balance');
+        $totalCashAdvances = (clone $cashAdvanceQuery)->count();
+        $pendingCashAdvances = (clone $cashAdvanceQuery)->where('status', 'pending')->count();
+        $approvedCashAdvances = (clone $cashAdvanceQuery)->where('status', 'approved')->count();
+        $rejectedCashAdvances = (clone $cashAdvanceQuery)->where('status', 'rejected')->count();
+        $completedCashAdvances = (clone $cashAdvanceQuery)->where('status', 'completed')->count();
+        $totalCashAdvanceAmount = (clone $cashAdvanceQuery)->where('status', 'approved')->sum('approved_amount');
+        $outstandingCashAdvances = (clone $cashAdvanceQuery)->where('status', 'approved')->sum('outstanding_balance');
 
         // Active Pay Schedules
         $activePaySchedules = PayScheduleSetting::where('is_active', true)->count();
@@ -104,29 +123,39 @@ class DashboardController extends Controller
         $activeSuspensions = NoWorkSuspendedSetting::where('status', 'active')->count();
 
         // Monthly Payroll Totals
-        $currentMonthPayroll = Payroll::where('is_paid', true)
+        $currentMonthPayroll = (clone $payrollQuery)->where('is_paid', true)
             ->whereMonth('period_start', $currentMonth->month)
             ->whereYear('period_start', $currentMonth->year)
             ->sum('total_gross');
 
-        $lastMonthPayroll = Payroll::where('is_paid', true)
+        $lastMonthPayroll = (clone $payrollQuery)->where('is_paid', true)
             ->whereMonth('period_start', $lastMonth->month)
             ->whereYear('period_start', $lastMonth->year)
             ->sum('total_gross');
 
-        // Department Statistics
-        $departmentStats = Department::withCount(['employees' => function ($query) {
+        // Department Statistics (scoped to company)
+        $departmentQuery = Department::query();
+        if (!$user->isSuperAdmin()) {
+            // Only include departments with employees from this company
+            $departmentQuery->whereHas('employees', function ($q) use ($user) {
+                $q->where('company_id', $user->company_id);
+            });
+        }
+        $departmentStats = $departmentQuery->withCount(['employees' => function ($query) use ($user) {
             $query->where('employment_status', 'active');
+            if (!$user->isSuperAdmin()) {
+                $query->where('company_id', $user->company_id);
+            }
         }])->get();
 
         // Employment Type Distribution
-        $employmentTypes = Employee::where('employment_status', 'active')
+        $employmentTypes = (clone $employeeQuery)->where('employment_status', 'active')
             ->selectRaw('employment_type, COUNT(*) as count')
             ->groupBy('employment_type')
             ->get();
 
         // Pay Schedule Distribution
-        $paySchedules = Employee::where('employment_status', 'active')
+        $paySchedules = (clone $employeeQuery)->where('employment_status', 'active')
             ->selectRaw('pay_schedule, COUNT(*) as count')
             ->groupBy('pay_schedule')
             ->get();
@@ -137,14 +166,14 @@ class DashboardController extends Controller
             $month = Carbon::now()->subMonths($i);
             $monthlyTrends[] = [
                 'month' => $month->format('M Y'),
-                'employees_hired' => Employee::whereMonth('hire_date', $month->month)
+                'employees_hired' => (clone $employeeQuery)->whereMonth('hire_date', $month->month)
                     ->whereYear('hire_date', $month->year)
                     ->count(),
-                'payrolls_processed' => Payroll::where('is_paid', true)
+                'payrolls_processed' => (clone $payrollQuery)->where('is_paid', true)
                     ->whereMonth('period_start', $month->month)
                     ->whereYear('period_start', $month->year)
                     ->count(),
-                'total_paid' => Payroll::where('is_paid', true)
+                'total_paid' => (clone $payrollQuery)->where('is_paid', true)
                     ->whereMonth('period_start', $month->month)
                     ->whereYear('period_start', $month->year)
                     ->sum('total_net'),
@@ -161,10 +190,10 @@ class DashboardController extends Controller
             : ($currentMonthPayroll > 0 ? 100 : 0);
 
         // Cash advance growth rate calculation
-        $currentMonthCashAdvances = CashAdvance::whereMonth('created_at', $currentMonth->month)
+        $currentMonthCashAdvances = (clone $cashAdvanceQuery)->whereMonth('created_at', $currentMonth->month)
             ->whereYear('created_at', $currentMonth->year)
             ->count();
-        $lastMonthCashAdvances = CashAdvance::whereMonth('created_at', $lastMonth->month)
+        $lastMonthCashAdvances = (clone $cashAdvanceQuery)->whereMonth('created_at', $lastMonth->month)
             ->whereYear('created_at', $lastMonth->year)
             ->count();
 
@@ -217,23 +246,38 @@ class DashboardController extends Controller
     {
         $stats = [];
 
-        if ($user->hasAnyRole(['System Admin', 'HR Head', 'HR Staff'])) {
-            // Admin/HR stats
-            $stats['total_employees'] = Employee::where('employment_status', 'active')->count();
-            $stats['pending_payrolls'] = Payroll::where('status', 'processing')->count();
-            $stats['pending_cash_advances'] = CashAdvance::where('status', 'pending')->count();
-            $stats['active_payrolls'] = Payroll::whereIn('status', ['draft', 'processing'])->count();
+        if ($user->hasAnyRole(['System Administrator', 'HR Head', 'HR Staff'])) {
+            // Admin/HR stats - scoped to company
+            $employeeQuery = Employee::query();
+            $payrollQuery = Payroll::query();
+            $cashAdvanceQuery = CashAdvance::query();
+
+            if (!$user->isSuperAdmin()) {
+                $companyId = $user->company_id;
+                $employeeQuery->where('company_id', $companyId);
+                $payrollQuery->whereHas('payrollDetails.employee', function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                });
+                $cashAdvanceQuery->whereHas('employee', function ($q) use ($companyId) {
+                    $q->where('company_id', $companyId);
+                });
+            }
+
+            $stats['total_employees'] = $employeeQuery->where('employment_status', 'active')->count();
+            $stats['pending_payrolls'] = $payrollQuery->where('status', 'processing')->count();
+            $stats['pending_cash_advances'] = $cashAdvanceQuery->where('status', 'pending')->count();
+            $stats['active_payrolls'] = (clone $payrollQuery)->whereIn('status', ['draft', 'processing'])->count();
 
             // Current month payroll totals
             $currentMonth = Carbon::now()->format('Y-m');
-            $monthlyPayroll = Payroll::where('is_paid', true)
+            $monthlyPayroll = (clone $payrollQuery)->where('is_paid', true)
                 ->whereRaw("DATE_FORMAT(period_start, '%Y-%m') = ?", [$currentMonth])
                 ->sum('total_net');
             $stats['monthly_payroll'] = $monthlyPayroll;
 
             // Cash advance statistics
-            $stats['total_cash_advances'] = CashAdvance::count();
-            $stats['outstanding_advances'] = CashAdvance::where('status', 'approved')->sum('outstanding_balance');
+            $stats['total_cash_advances'] = $cashAdvanceQuery->count();
+            $stats['outstanding_advances'] = (clone $cashAdvanceQuery)->where('status', 'approved')->sum('outstanding_balance');
         } else {
             // Employee stats
             $employee = $user->employee;
@@ -364,7 +408,7 @@ class DashboardController extends Controller
         $notifications = [];
 
         // System Administrator gets no notifications
-        if ($user->hasRole('System Administrator')) {
+        if ($user->isSuperAdmin()) {
             return $notifications; // Return empty array
         } elseif ($user->hasRole('HR Head')) {
             // Processing payrolls

@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
@@ -15,7 +16,13 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        $query = User::with('roles');
+        $user = Auth::user();
+        $query = User::with('roles', 'company');
+
+        // Company scoping - System Admin only sees their company users
+        if (!$user->isSuperAdmin()) {
+            $query->where('company_id', $user->company_id);
+        }
 
         // Apply filters
         if ($request->filled('search')) {
@@ -33,18 +40,23 @@ class UserController extends Controller
 
         $users = $query->orderBy('created_at', 'desc')->paginate(10);
 
-        // Calculate user statistics by role (using full dataset, not filtered)
+        // Calculate user statistics by role (scoped to company if not Super Admin)
+        $statsQuery = User::query();
+        if (!$user->isSuperAdmin()) {
+            $statsQuery->where('company_id', $user->company_id);
+        }
+
         $userStats = [
-            'system_administrator' => User::whereHas('roles', function ($query) {
+            'system_administrator' => (clone $statsQuery)->whereHas('roles', function ($query) {
                 $query->where('name', 'System Administrator');
             })->count(),
-            'hr_head' => User::whereHas('roles', function ($query) {
+            'hr_head' => (clone $statsQuery)->whereHas('roles', function ($query) {
                 $query->where('name', 'HR Head');
             })->count(),
-            'hr_staff' => User::whereHas('roles', function ($query) {
+            'hr_staff' => (clone $statsQuery)->whereHas('roles', function ($query) {
                 $query->where('name', 'HR Staff');
             })->count(),
-            'employee' => User::whereHas('roles', function ($query) {
+            'employee' => (clone $statsQuery)->whereHas('roles', function ($query) {
                 $query->where('name', 'Employee');
             })->count(),
         ];
@@ -67,8 +79,24 @@ class UserController extends Controller
      */
     public function create()
     {
-        $roles = \Spatie\Permission\Models\Role::all();
-        return view('users.create', compact('roles'));
+        $user = Auth::user();
+
+        // Only allow creating these roles (exclude Super Admin)
+        $roles = \Spatie\Permission\Models\Role::whereIn('name', [
+            'System Administrator',
+            'HR Head',
+            'HR Staff',
+            'Employee'
+        ])->get();
+
+        // Super Admin can select any company, System Admin locked to their company
+        if ($user->isSuperAdmin()) {
+            $companies = \App\Models\Company::where('is_active', true)->orderBy('name')->get();
+        } else {
+            $companies = \App\Models\Company::where('id', $user->company_id)->get();
+        }
+
+        return view('users.create', compact('roles', 'companies'));
     }
 
     /**
@@ -76,18 +104,43 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $authUser = Auth::user();
+
+        // Validation rules
+        $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role' => 'required|in:System Administrator,HR Head,HR Staff,Employee',
-        ]);
+        ];
 
-        DB::transaction(function () use ($request) {
+        // Super Admin must select a company, System Admin uses their own
+        if ($authUser->isSuperAdmin()) {
+            $rules['company_id'] = 'required|exists:companies,id';
+        }
+
+        $request->validate($rules);
+
+        DB::transaction(function () use ($request, $authUser) {
+            // Map role name to role field value
+            $roleFieldMapping = [
+                'System Administrator' => 'system_admin',
+                'HR Head' => 'hr_head',
+                'HR Staff' => 'hr_staff',
+                'Employee' => 'employee',
+            ];
+
+            // Determine company_id
+            $companyId = $authUser->isSuperAdmin()
+                ? $request->company_id
+                : $authUser->company_id;
+
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
+                'company_id' => $companyId,
+                'role' => $roleFieldMapping[$request->role] ?? 'employee',
                 'email_verified_at' => now(), // Auto-verify email for admin created users
             ]);
 
@@ -111,8 +164,34 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        $roles = \Spatie\Permission\Models\Role::all();
-        return view('users.edit', compact('user', 'roles'));
+        $authUser = Auth::user();
+
+        // Prevent editing Super Admin
+        if ($user->hasRole('Super Admin')) {
+            return redirect()->route('users.index')->with('error', 'Cannot edit the Super Admin account.');
+        }
+
+        // System Admin can only edit users from their company
+        if (!$authUser->isSuperAdmin() && $user->company_id !== $authUser->company_id) {
+            return redirect()->route('users.index')->with('error', 'You can only edit users from your company.');
+        }
+
+        // Only allow editing these roles (exclude Super Admin)
+        $roles = \Spatie\Permission\Models\Role::whereIn('name', [
+            'System Administrator',
+            'HR Head',
+            'HR Staff',
+            'Employee'
+        ])->get();
+
+        // Super Admin can select any company, System Admin locked to their company
+        if ($authUser->isSuperAdmin()) {
+            $companies = \App\Models\Company::where('is_active', true)->orderBy('name')->get();
+        } else {
+            $companies = \App\Models\Company::where('id', $authUser->company_id)->get();
+        }
+
+        return view('users.edit', compact('user', 'roles', 'companies'));
     }
 
     /**
@@ -120,17 +199,52 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        $request->validate([
+        $authUser = Auth::user();
+
+        // Prevent updating Super Admin
+        if ($user->hasRole('Super Admin')) {
+            return redirect()->route('users.index')->with('error', 'Cannot edit the Super Admin account.');
+        }
+
+        // System Admin can only update users from their company
+        if (!$authUser->isSuperAdmin() && $user->company_id !== $authUser->company_id) {
+            return redirect()->route('users.index')->with('error', 'You can only edit users from your company.');
+        }
+
+        // Validation rules
+        $rules = [
             'name' => 'required|string|max:255',
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:8|confirmed',
             'role' => 'required|in:System Administrator,HR Head,HR Staff,Employee',
-        ]);
+        ];
 
-        DB::transaction(function () use ($request, $user) {
+        // Super Admin can change company, System Admin cannot
+        if ($authUser->isSuperAdmin()) {
+            $rules['company_id'] = 'required|exists:companies,id';
+        }
+
+        $request->validate($rules);
+
+        DB::transaction(function () use ($request, $user, $authUser) {
+            // Map role name to role field value
+            $roleFieldMapping = [
+                'System Administrator' => 'system_admin',
+                'HR Head' => 'hr_head',
+                'HR Staff' => 'hr_staff',
+                'Employee' => 'employee',
+            ];
+
+            // Determine company_id (Super Admin can change, System Admin uses existing)
+            $companyId = $authUser->isSuperAdmin()
+                ? $request->company_id
+                : $user->company_id;
+
             $updateData = [
                 'name' => $request->name,
                 'email' => $request->email,
+                'company_id' => $companyId,
+                'role' => $roleFieldMapping[$request->role] ?? 'employee',
             ];
 
             if ($request->filled('password')) {
@@ -151,6 +265,18 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        $authUser = Auth::user();
+
+        // Prevent deleting Super Admin
+        if ($user->hasRole('Super Admin')) {
+            return redirect()->route('users.index')->with('error', 'Cannot delete the Super Admin account.');
+        }
+
+        // System Admin can only delete users from their company
+        if (!$authUser->isSuperAdmin() && $user->company_id !== $authUser->company_id) {
+            return redirect()->route('users.index')->with('error', 'You can only delete users from your company.');
+        }
+
         // Prevent deleting the last System Administrator
         if ($user->role === 'system_admin') {
             $systemAdminCount = User::where('role', 'system_admin')->count();

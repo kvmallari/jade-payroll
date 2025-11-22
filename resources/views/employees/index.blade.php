@@ -17,6 +17,19 @@
                                    placeholder="Name, Employee #, Email" 
                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         </div>
+                        @if(Auth::user()->isSuperAdmin())
+                        <div class="flex-1 min-w-40">
+                            <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
+                            <select name="company" id="company" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                <option value="">All Companies</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ $company->id }}" {{ request('company') == $company->id ? 'selected' : '' }}>
+                                        {{ $company->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
                         <div class="flex-1 min-w-40">
                             <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
                             <select name="department" id="department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -239,6 +252,7 @@
             <form id="exportForm" method="POST" action="{{ route('employees.generate-summary') }}">
                 @csrf
                 <input type="hidden" name="search" id="export_search">
+                <input type="hidden" name="company" id="export_company">
                 <input type="hidden" name="department" id="export_department">
                 <input type="hidden" name="employment_status" id="export_employment_status">
                 <input type="hidden" name="sort_name" id="export_sort_name">
@@ -313,6 +327,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Live filtering functionality
         const searchInput = document.getElementById('search');
+        const companySelect = document.getElementById('company');
         const departmentSelect = document.getElementById('department');
         const employmentStatusSelect = document.getElementById('employment_status');
         const sortNameSelect = document.getElementById('sort_name');
@@ -339,6 +354,7 @@
 
             // Add filter parameters with null checks
             if (searchInput && searchInput.value.trim()) params.set('search', searchInput.value.trim());
+            if (companySelect && companySelect.value) params.set('company', companySelect.value);
             if (departmentSelect && departmentSelect.value) params.set('department', departmentSelect.value);
             if (employmentStatusSelect && employmentStatusSelect.value) params.set('employment_status', employmentStatusSelect.value);
             if (sortNameSelect && sortNameSelect.value) params.set('sort_name', sortNameSelect.value);
@@ -382,6 +398,11 @@
                 updateFilters();
             }, 500));
         }
+        if (companySelect) {
+            companySelect.addEventListener('change', function() {
+                updateFilters();
+            });
+        }
         if (departmentSelect) {
             departmentSelect.addEventListener('change', function() {
                 updateFilters();
@@ -417,6 +438,9 @@
         window.openExportModal = function() {
             // Copy current filter values to hidden form inputs
             document.getElementById('export_search').value = document.getElementById('search').value;
+            if (document.getElementById('company')) {
+                document.getElementById('export_company').value = document.getElementById('company').value;
+            }
             document.getElementById('export_department').value = document.getElementById('department').value;
             document.getElementById('export_employment_status').value = document.getElementById('employment_status').value;
             document.getElementById('export_sort_name').value = document.getElementById('sort_name').value;

@@ -287,7 +287,7 @@
                     </div>
                     @endcan
 
-                    @hasrole('System Administrator')
+                    @hasrole('Super Admin|System Administrator')
                     <div class="relative inline-flex" x-data="{ open: false }">
                         <button @click="open = ! open" 
                                 class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none h-16
@@ -326,6 +326,19 @@
                                         <div class="text-xs text-green-600 mt-1">Add HR Head, HR Staff, or System Admin</div>
                                     </div>
                                 </a>
+                                
+                                @if(auth()->user()->isSuperAdmin())
+                                <a href="{{ route('companies.index') }}" 
+                                   class="flex items-center px-6 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-800 transition-colors duration-150 border-t border-gray-100">
+                                    <svg class="mr-4 h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    </svg>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-blue-700">Manage Companies</div>
+                                        <div class="text-xs text-blue-600 mt-1">Super Admin Only</div>
+                                    </div>
+                                </a>
+                                @endif
                             </div>
                         </div>
                     </div>

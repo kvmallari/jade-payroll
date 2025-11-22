@@ -10,6 +10,7 @@ class Setting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'key',
         'value',
         'type',
@@ -20,6 +21,14 @@ class Setting extends Model
     protected $casts = [
         'value' => 'string',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Get a setting value by key

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\SetCompanyScope;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\ValidateLicense;
 use Illuminate\Foundation\Application;
@@ -36,8 +37,15 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             ValidateLicense::class,
+            SetCompanyScope::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Redirect unauthorized access to dashboard
+        $exceptions->render(function (\Spatie\Permission\Exceptions\UnauthorizedException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Unauthorized access.'], 403);
+            }
+            return redirect()->route('dashboard')->with('error', 'You do not have permission to access that page.');
+        });
     })->create();

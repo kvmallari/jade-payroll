@@ -12,6 +12,7 @@ class AllowanceBonusSetting extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',
@@ -55,6 +56,14 @@ class AllowanceBonusSetting extends Model
         'is_system_default' => 'boolean',
         'requires_perfect_attendance' => 'boolean',
     ];
+
+    /**
+     * Get the company that owns this setting
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Mutators to handle empty decimal values

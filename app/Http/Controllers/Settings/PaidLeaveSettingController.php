@@ -5,12 +5,20 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\PaidLeaveSetting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class PaidLeaveSettingController extends Controller
 {
     public function index()
     {
-        $leaveSettings = PaidLeaveSetting::orderBy('sort_order')->get();
+        $user = Auth::user();
+
+        $leaveSettings = PaidLeaveSetting::query()
+            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
+                $query->where('company_id', $user->company_id);
+            })
+            ->orderBy('sort_order')
+            ->get();
 
         return view('settings.leaves.index', compact('leaveSettings'));
     }
@@ -43,6 +51,7 @@ class PaidLeaveSettingController extends Controller
 
         $validated['code'] = $code;
         $validated['is_active'] = true; // Always active by default
+        $validated['company_id'] = Auth::user()->company_id;
 
         PaidLeaveSetting::create($validated);
 

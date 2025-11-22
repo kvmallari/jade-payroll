@@ -522,7 +522,7 @@
                                     <span class="text-purple-700 font-medium">Add Paid Leave</span>
                                 </a>
                                 
-                                @if(Auth::user()->hasRole('System Administrator'))
+                                @if(Auth::user()->isSuperAdmin())
                                     <a href="{{ route('users.create') }}" class="flex items-center p-3 bg-red-50 rounded-lg hover:bg-red-100 transition">
                                         <span class="text-red-600 mr-3">👥</span>
                                         <span class="text-red-700 font-medium">Create New User</span>

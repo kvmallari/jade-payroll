@@ -414,6 +414,7 @@
 
             // Add filter parameters
             if (searchInput.value.trim()) params.set('search', searchInput.value.trim());
+            if (companySelect && companySelect.value) params.set('company', companySelect.value);
             if (roleSelect.value) params.set('role', roleSelect.value);
             
             // Add per_page parameter if not default
@@ -453,6 +454,9 @@
 
         // Add event listeners for live filtering
         searchInput.addEventListener('input', debounce(updateFilters, 500));
+        if (companySelect) {
+            companySelect.addEventListener('change', updateFilters);
+        }
         roleSelect.addEventListener('change', updateFilters);
         
         // Add event listener for per_page changes

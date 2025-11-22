@@ -30,6 +30,33 @@
                             @enderror
                         </div>
 
+                        @if(auth()->user()->isSuperAdmin())
+                        <div class="md:col-span-2">
+                            <label for="company_id" class="block text-sm font-medium text-gray-700">Company <span class="text-red-500">*</span></label>
+                            <select name="company_id" id="company_id" required
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('company_id') border-red-500 @enderror">
+                                <option value="">Select a company</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ $company->id }}" {{ old('company_id') == $company->id ? 'selected' : '' }}>
+                                        {{ $company->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('company_id')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        @else
+                        <!-- System Admin: Company auto-assigned -->
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">Company</label>
+                            <input type="text" value="{{ $companies->first()->name ?? 'N/A' }}" disabled
+                                   class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm sm:text-sm">
+                            <p class="mt-1 text-xs text-gray-500">Users will be created for your assigned company</p>
+                            <input type="hidden" name="company_id" value="{{ $companies->first()->id ?? '' }}">
+                        </div>
+                        @endif
+
                         <div class="md:col-span-2">
                             <label for="role" class="block text-sm font-medium text-gray-700">Role <span class="text-red-500">*</span></label>
                             <select name="role" id="role" required

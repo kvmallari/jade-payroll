@@ -8,13 +8,21 @@ use App\Models\Department;
 use App\Models\Position;
 use App\Models\Employee;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class NoWorkSuspendedSettingController extends Controller
 {
     public function index()
     {
+        $user = Auth::user();
+
         // Get all suspensions ordered by date (latest first), maintain this order throughout
-        $allSuspensions = NoWorkSuspendedSetting::orderBy('date_from', 'desc')->get();
+        $allSuspensions = NoWorkSuspendedSetting::query()
+            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
+                $query->where('company_id', $user->company_id);
+            })
+            ->orderBy('date_from', 'desc')
+            ->get();
 
         // Group by status but preserve the date ordering within each group
         $suspensions = $allSuspensions->groupBy('status');
@@ -87,6 +95,9 @@ class NoWorkSuspendedSettingController extends Controller
                 $validated['pay_rule'] = 'full';
             }
         }
+
+        // Add company_id from logged in user
+        $validated['company_id'] = Auth::user()->company_id;
 
         NoWorkSuspendedSetting::create($validated);
 
