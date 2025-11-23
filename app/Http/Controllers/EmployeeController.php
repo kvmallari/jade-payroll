@@ -36,7 +36,10 @@ class EmployeeController extends Controller
         } else {
             // For System Administrator, apply company filter if provided
             if ($request->filled('company')) {
-                $query->where('company_id', $request->company);
+                $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+                if ($company) {
+                    $query->where('company_id', $company->id);
+                }
             }
         }
 
@@ -87,7 +90,7 @@ class EmployeeController extends Controller
         // Get companies for filter (only for System Administrator)
         $companies = [];
         if ($user->isSuperAdmin()) {
-            $companies = \App\Models\Company::where('is_active', true)->orderBy('name')->get();
+            $companies = \App\Models\Company::latest('created_at')->get();
         }
 
         // Get performance data for current month (based on DTR)

@@ -5,18 +5,24 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\Holiday;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class HolidaySettingController extends Controller
 {
     public function index()
     {
         $currentYear = date('Y');
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
+
+        // Build base query with company scope
+        $query = Holiday::where('year', $currentYear)
+            ->where('company_id', $workingCompanyId);
 
         // Get holidays with custom ordering: Regular first, then Special, each sorted by date desc
         $holidays = collect();
 
         // Get Regular Holidays first (ordered from Dec to Jan)
-        $regularHolidays = Holiday::where('year', $currentYear)
+        $regularHolidays = (clone $query)
             ->where('type', 'regular')
             ->orderBy('date', 'desc')
             ->get();
@@ -26,7 +32,7 @@ class HolidaySettingController extends Controller
         }
 
         // Get Special Holidays second (ordered from Dec to Jan)
-        $specialHolidays = Holiday::where('year', $currentYear)
+        $specialHolidays = (clone $query)
             ->whereIn('type', ['special', 'special_non_working'])
             ->orderBy('date', 'desc')
             ->get();
@@ -36,7 +42,10 @@ class HolidaySettingController extends Controller
             $holidays->put('special_non_working', $specialHolidays);
         }
 
+        // Get years scoped to company
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
         $years = Holiday::selectRaw('DISTINCT year')
+            ->where('company_id', $workingCompanyId)
             ->orderBy('year', 'desc')
             ->pluck('year');
 
@@ -79,8 +88,13 @@ class HolidaySettingController extends Controller
             $validated['pay_rule'] = 'full';
         }
 
-        // Check for duplicates (same date only - each date can only have one holiday)
-        $existingHoliday = Holiday::where('date', $validated['date'])->first();
+        // Auto-assign company_id
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
+
+        // Check for duplicates within the same company (same date only)
+        $existingHoliday = Holiday::where('date', $validated['date'])
+            ->where('company_id', $validated['company_id'])
+            ->first();
 
         if ($existingHoliday) {
             return redirect()->back()

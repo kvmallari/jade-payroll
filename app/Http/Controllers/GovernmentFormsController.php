@@ -19,6 +19,7 @@ use App\Exports\SSSReportExport;
 use App\Exports\PhilHealthReportExport;
 use App\Exports\PagibigReportExport;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -251,6 +252,16 @@ class GovernmentFormsController extends Controller
 
         $query = Employee::with(['user', 'department', 'position']);
 
+        // Company filtering for Super Admin
+        if (Auth::user()->isSuperAdmin() && $request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $query->where('company_id', $company->id);
+            }
+        } elseif (!Auth::user()->isSuperAdmin()) {
+            $query->where('company_id', Auth::user()->company_id);
+        }
+
         // Apply filters
         if ($request->filled('search')) {
             $search = $request->search;
@@ -305,7 +316,9 @@ class GovernmentFormsController extends Controller
             ]);
         }
 
-        return view('government-forms.bir-2316-employees', compact('employees', 'year', 'departments'));
+        $companies = Auth::user()->isSuperAdmin() ? \App\Models\Company::latest('created_at')->get() : collect();
+
+        return view('government-forms.bir-2316-employees', compact('employees', 'year', 'departments', 'companies'));
     }
 
     /**

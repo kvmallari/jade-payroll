@@ -1,9 +1,10 @@
-<?php
+    <?php
 
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\Company;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,14 @@ class UserController extends Controller
         // Company scoping - System Admin only sees their company users
         if (!$user->isSuperAdmin()) {
             $query->where('company_id', $user->company_id);
+        } else {
+            // Super Admin can filter by company
+            if ($request->filled('company')) {
+                $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+                if ($company) {
+                    $query->where('company_id', $company->id);
+                }
+            }
         }
 
         // Apply filters
@@ -38,12 +47,17 @@ class UserController extends Controller
             });
         }
 
-        $users = $query->orderBy('created_at', 'desc')->paginate(10);
+        $users = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
 
         // Calculate user statistics by role (scoped to company if not Super Admin)
         $statsQuery = User::query();
         if (!$user->isSuperAdmin()) {
             $statsQuery->where('company_id', $user->company_id);
+        } else if ($request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $statsQuery->where('company_id', $company->id);
+            }
         }
 
         $userStats = [
@@ -61,7 +75,10 @@ class UserController extends Controller
             })->count(),
         ];
 
-        // Return JSON for AJAX requests
+        // Get companies list for Super Admin filter
+        $companies = $user->isSuperAdmin()
+            ? Company::latest('created_at')->get()
+            : collect();        // Return JSON for AJAX requests
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'users' => $users,
@@ -71,7 +88,7 @@ class UserController extends Controller
             ]);
         }
 
-        return view('users.index', compact('users', 'userStats'));
+        return view('users.index', compact('users', 'userStats', 'companies'));
     }
 
     /**
@@ -142,10 +159,17 @@ class UserController extends Controller
                 'company_id' => $companyId,
                 'role' => $roleFieldMapping[$request->role] ?? 'employee',
                 'email_verified_at' => now(), // Auto-verify email for admin created users
+                'authorized_email' => $request->email, // Lock email to role - prevents role manipulation
             ]);
 
             // Assign the selected role using Spatie
             $user->assignRole($request->role);
+
+            // Activate company if this is the first user assigned to it
+            $company = Company::find($companyId);
+            if ($company && !$company->is_active && $company->users()->count() === 1) {
+                $company->update(['is_active' => true]);
+            }
         });
 
         return redirect()->route('users.index')->with('success', 'User created successfully.');
@@ -218,6 +242,20 @@ class UserController extends Controller
             'password' => 'nullable|string|min:8|confirmed',
             'role' => 'required|in:System Administrator,HR Head,HR Staff,Employee',
         ];
+
+        // Prevent email change if authorized_email is set (role-email lock)
+        if ($user->authorized_email && $request->email !== $user->authorized_email) {
+            return redirect()->back()
+                ->withErrors(['email' => 'Email cannot be changed for this user. It is locked to their role.'])
+                ->withInput();
+        }
+
+        // Prevent role change for Super Admin email
+        if ($user->email === 'superadmin@jadepayroll.com' && $request->role !== 'Super Admin') {
+            return redirect()->back()
+                ->withErrors(['role' => 'Cannot change role for the Super Administrator account.'])
+                ->withInput();
+        }
 
         // Super Admin can change company, System Admin cannot
         if ($authUser->isSuperAdmin()) {

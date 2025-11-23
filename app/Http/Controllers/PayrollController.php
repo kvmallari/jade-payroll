@@ -83,6 +83,20 @@ class PayrollController extends Controller
             ->withCount('payrollDetails')
             ->orderBy('created_at', 'desc');
 
+        // Company filtering for Super Admin
+        if (Auth::user()->isSuperAdmin() && $request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $query->whereHas('payrollDetails.employee', function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                });
+            }
+        } elseif (!Auth::user()->isSuperAdmin()) {
+            $query->whereHas('payrollDetails.employee', function ($q) {
+                $q->where('company_id', Auth::user()->company_id);
+            });
+        }
+
         // Filter by pay schedule
         if ($request->filled('pay_schedule')) {
             $query->where('pay_schedule', $request->pay_schedule);
@@ -245,7 +259,12 @@ class PayrollController extends Controller
             ]);
         }
 
-        return view('payrolls.index', compact('payrolls', 'summaryStats'));
+        // Get companies for Super Admin filter
+        $companies = Auth::user()->isSuperAdmin()
+            ? \App\Models\Company::latest('created_at')->get()
+            : collect();
+
+        return view('payrolls.index', compact('payrolls', 'summaryStats', 'companies'));
     }
 
     /**

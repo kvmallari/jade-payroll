@@ -15,6 +15,19 @@
                                placeholder="Name, Email" 
                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                     </div>
+                    @if(Auth::user()->isSuperAdmin())
+                    <div class="flex-1 min-w-40">
+                        <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
+                        <select name="company" id="company" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="">All Companies</option>
+                            @foreach($companies as $company)
+                                <option value="{{ strtolower($company->name) }}" {{ request('company') == strtolower($company->name) ? 'selected' : '' }}>
+                                    {{ $company->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
                     <div class="flex-1 min-w-40">
                         <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
                         <select name="role" id="role" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -190,6 +203,7 @@
             <form id="exportForm" method="POST" action="{{ route('users.generate-summary') }}">
                 @csrf
                 <input type="hidden" name="search" id="export_search">
+                <input type="hidden" name="company" id="export_company">
                 <input type="hidden" name="role" id="export_role">
                 
                 <div class="items-center px-4 py-3">
@@ -254,6 +268,10 @@
     function openExportModal() {
         // Set current filter values
         document.getElementById('export_search').value = document.getElementById('search').value || '';
+        const companySelectForExport = document.getElementById('company');
+        if (companySelectForExport) {
+            document.getElementById('export_company').value = companySelectForExport.value || '';
+        }
         document.getElementById('export_role').value = document.getElementById('role').value || '';
         
         document.getElementById('exportModal').classList.remove('hidden');
@@ -392,6 +410,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Live filtering functionality
         const searchInput = document.getElementById('search');
+        const companySelect = document.getElementById('company');
         const roleSelect = document.getElementById('role');
 
         // Debounce function for search input
@@ -445,6 +464,9 @@
                 
                 // Update export form hidden inputs
                 document.getElementById('export_search').value = searchInput.value.trim();
+                if (companySelect) {
+                    document.getElementById('export_company').value = companySelect.value;
+                }
                 document.getElementById('export_role').value = roleSelect.value;
             })
             .catch(error => {

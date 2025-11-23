@@ -17,12 +17,13 @@ class EmployerSettingController extends Controller
      */
     public function index()
     {
-        // Only allow System Administrator and HR Head to access employer settings
-        if (!Auth::user()->hasRole(['System Administrator', 'HR Head'])) {
+        // Only allow Super Admin, System Administrator and HR Head to access employer settings
+        if (!Auth::user()->hasRole(['Super Admin', 'System Administrator', 'HR Head'])) {
             abort(403, 'This action is unauthorized.');
         }
 
-        $settings = EmployerSetting::getSettings();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
+        $settings = EmployerSetting::getSettings($workingCompanyId);
 
         return view('settings.employer-settings.index', compact('settings'));
     }
@@ -32,8 +33,8 @@ class EmployerSettingController extends Controller
      */
     public function update(Request $request)
     {
-        // Only allow System Administrator and HR Head to access employer settings
-        if (!Auth::user()->hasRole(['System Administrator', 'HR Head'])) {
+        // Only allow Super Admin, System Administrator and HR Head to update employer settings
+        if (!Auth::user()->hasRole(['Super Admin', 'System Administrator', 'HR Head'])) {
             abort(403, 'This action is unauthorized.');
         }
 
@@ -52,7 +53,7 @@ class EmployerSettingController extends Controller
             'signatory_designation' => 'nullable|string|max:255',
         ]);
 
-        EmployerSetting::updateSettings($validated);
+        EmployerSetting::updateSettings($validated, Auth::user()->getWorkingCompanyId());
 
         return redirect()->route('settings.employer.index')
             ->with('success', 'Employer settings updated successfully!');

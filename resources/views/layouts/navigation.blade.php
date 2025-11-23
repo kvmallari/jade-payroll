@@ -154,7 +154,7 @@
                                     </div>
                                 </a>
                                 
-                                @hasanyrole('HR Head|HR Staff|System Administrator')
+                                @hasanyrole('HR Head|HR Staff|System Administrator|Super Admin')
                                 <a href="{{ route('cash-advances.create') }}" 
                                    class="flex items-center px-6 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 transition-colors duration-150 border-t border-gray-100">
                                     <svg class="mr-4 h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\TimeSchedule;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 class TimeScheduleController extends Controller
 {
@@ -13,8 +14,10 @@ class TimeScheduleController extends Controller
      */
     public function index()
     {
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
         $timeSchedules = TimeSchedule::with('employees')
             ->withCount('employees')
+            ->where('company_id', $workingCompanyId)
             ->orderBy('name')
             ->get();
 
@@ -45,6 +48,9 @@ class TimeScheduleController extends Controller
             'total_hours' => 'nullable|numeric|min:0|max:24',
             'is_active' => 'boolean',
         ]);
+
+        // Add company_id to validated data
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         $timeSchedule = TimeSchedule::create($validated);
 

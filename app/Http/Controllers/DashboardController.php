@@ -38,10 +38,10 @@ class DashboardController extends Controller
         // Get notifications
         $notifications = $this->getNotifications($user);
 
-        // Get advanced dashboard data for System Administrator
+        // Get advanced dashboard data for admins
         $dashboardData = [];
 
-        if ($user->hasAnyRole(['System Administrator', 'HR Head', 'HR Staff'])) {
+        if ($user->hasAnyRole(['Super Admin', 'System Administrator', 'HR Head', 'HR Staff'])) {
             $dashboardData = $this->getAdvancedDashboardData();
         }
 
@@ -246,8 +246,8 @@ class DashboardController extends Controller
     {
         $stats = [];
 
-        if ($user->hasAnyRole(['System Administrator', 'HR Head', 'HR Staff'])) {
-            // Admin/HR stats - scoped to company
+        if ($user->hasAnyRole(['Super Admin', 'System Administrator', 'HR Head', 'HR Staff'])) {
+            // Admin/HR stats - scoped to company (Super Admin sees all)
             $employeeQuery = Employee::query();
             $payrollQuery = Payroll::query();
             $cashAdvanceQuery = CashAdvance::query();
@@ -311,7 +311,7 @@ class DashboardController extends Controller
     {
         $activities = [];
 
-        if ($user->hasAnyRole(['System Administrator', 'HR Head', 'HR Staff'])) {
+        if ($user->hasAnyRole(['Super Admin', 'System Administrator', 'HR Head', 'HR Staff'])) {
             // Recent payrolls
             $recentPayrolls = Payroll::with('creator')
                 ->latest()

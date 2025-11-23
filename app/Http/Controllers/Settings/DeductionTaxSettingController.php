@@ -15,12 +15,9 @@ class DeductionTaxSettingController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
 
-        $deductions = DeductionTaxSetting::query()
-            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
-                $query->where('company_id', $user->company_id);
-            })
+        $deductions = DeductionTaxSetting::where('company_id', $workingCompanyId)
             ->orderBy('type')
             ->orderBy('sort_order')
             ->get()
@@ -94,7 +91,7 @@ class DeductionTaxSettingController extends Controller
         }
 
         // Add company_id from logged in user
-        $validated['company_id'] = Auth::user()->company_id;
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         DeductionTaxSetting::create($validated);
 

@@ -5,6 +5,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetCompanyScope;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\ValidateLicense;
+use App\Http\Middleware\ValidateRoleEmailMatch;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -38,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
             ValidateLicense::class,
             SetCompanyScope::class,
+            ValidateRoleEmailMatch::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

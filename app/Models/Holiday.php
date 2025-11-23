@@ -8,6 +8,7 @@ use Carbon\Carbon;
 class Holiday extends Model
 {
     protected $fillable = [
+        'company_id',
         'name',
         'description',
         'date',

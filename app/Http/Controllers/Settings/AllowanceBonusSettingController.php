@@ -12,12 +12,9 @@ class AllowanceBonusSettingController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
 
-        $settings = AllowanceBonusSetting::query()
-            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
-                $query->where('company_id', $user->company_id);
-            })
+        $settings = AllowanceBonusSetting::where('company_id', $workingCompanyId)
             ->orderBy('type')
             ->orderBy('sort_order')
             ->get()
@@ -74,7 +71,7 @@ class AllowanceBonusSettingController extends Controller
         $validated['code'] = $code;
 
         // Add company_id from logged in user
-        $validated['company_id'] = Auth::user()->company_id;
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         AllowanceBonusSetting::create($validated);
 

@@ -64,6 +64,20 @@
                         </div>
                         @endunless
                         
+                        @if(Auth::user()->isSuperAdmin())
+                        <div class="flex-1 min-w-[180px]">
+                            <label class="block text-sm font-medium text-gray-700">Company</label>
+                            <select name="company" id="company" class="mt-1 block w-full h-10 px-3 border-gray-300 rounded-md shadow-sm paid-leave-filter focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">All Companies</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ strtolower($company->name) }}" {{ request('company') == strtolower($company->name) ? 'selected' : '' }}>
+                                        {{ $company->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
+                        
                         <div class="flex-1 min-w-[180px]">
                             <label class="block text-sm font-medium text-gray-700">Status</label>
                             <select name="status" id="status" class="mt-1 block w-full h-10 px-3 border-gray-300 rounded-md shadow-sm paid-leave-filter focus:border-indigo-500 focus:ring-indigo-500">

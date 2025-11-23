@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DaySchedule;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 class DayScheduleController extends Controller
 {
@@ -13,8 +14,10 @@ class DayScheduleController extends Controller
      */
     public function index()
     {
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
         $daySchedules = DaySchedule::with('employees')
             ->withCount('employees')
+            ->where('company_id', $workingCompanyId)
             ->orderBy('name')
             ->get();
 
@@ -48,6 +51,9 @@ class DayScheduleController extends Controller
             'sunday' => 'boolean',
             'is_active' => 'boolean',
         ]);
+
+        // Add company_id to validated data
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         $daySchedule = DaySchedule::create($validated);
 

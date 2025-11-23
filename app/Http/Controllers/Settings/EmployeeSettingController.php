@@ -20,8 +20,16 @@ class EmployeeSettingController extends Controller
     public function index()
     {
         $settings = $this->getEmployeeSettings();
-        $departments = Department::all();
-        $positions = Position::with('department')->get();
+        
+        // Scope data to user's working company
+        $user = Auth::user();
+        $workingCompanyId = $user->getWorkingCompanyId();
+        
+        $departmentsQuery = Department::where('company_id', $workingCompanyId);
+        $positionsQuery = Position::with('department')->where('company_id', $workingCompanyId);
+        
+        $departments = $departmentsQuery->get();
+        $positions = $positionsQuery->get();
         $timeSchedules = TimeSchedule::all();
         $daySchedules = DaySchedule::all();
         $paySchedules = PayScheduleSetting::all();
@@ -36,9 +44,7 @@ class EmployeeSettingController extends Controller
             'paySchedules',
             'employmentTypes'
         ));
-    }
-
-    public function update(Request $request)
+    }    public function update(Request $request)
     {
         $validated = $request->validate([
             'employee_number_prefix' => 'required|string|max:10',

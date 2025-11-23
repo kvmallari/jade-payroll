@@ -47,12 +47,26 @@
                 <div class="p-6">
                     <!-- Filter Controls -->
                     <div class="flex flex-wrap gap-4 items-end mb-4">
+                       
                         <div class="flex-1 min-w-48">
                             <label for="search" class="block text-sm font-medium text-gray-700">Search</label>
                             <input type="text" name="search" id="search" value="{{ request('search') }}"
                                 placeholder="Name, Employee #, Email"
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                         </div>
+                         @if(Auth::user()->isSuperAdmin())
+                        <div class="flex-1 min-w-48">
+                            <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
+                            <select name="company" id="company" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                <option value="">All Companies</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ strtolower($company->name) }}" {{ request('company') == strtolower($company->name) ? 'selected' : '' }}>
+                                        {{ $company->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
                         <div class="flex-1 min-w-40">
                             <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
                             <select name="department" id="department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -375,6 +389,8 @@
             }
 
             // Add event listeners for live filtering
+            const companySelect = document.getElementById('company');
+            if (companySelect) companySelect.addEventListener('change', updateFilters);
             if (searchInput) searchInput.addEventListener('input', debounce(updateFilters, 500));
             if (departmentSelect) departmentSelect.addEventListener('change', updateFilters);
             if (employmentStatusSelect) employmentStatusSelect.addEventListener('change', updateFilters);

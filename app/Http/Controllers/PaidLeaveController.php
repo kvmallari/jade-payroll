@@ -31,6 +31,21 @@ class PaidLeaveController extends Controller
 
         $query = PaidLeave::with(['employee', 'requestedBy', 'approvedBy']);
 
+        // Company filtering for Super Admin
+        if (Auth::user()->isSuperAdmin() && $request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $query->whereHas('employee', function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                });
+            }
+        } elseif (!Auth::user()->isSuperAdmin()) {
+            // Non-super admins see only their company's paid leaves
+            $query->whereHas('employee', function ($q) {
+                $q->where('company_id', Auth::user()->company_id);
+            });
+        }
+
         // If employee user, only show their own paid leaves
         if (Auth::user()->hasRole('Employee')) {
             $employee = Auth::user()->employee;
@@ -91,7 +106,12 @@ class PaidLeaveController extends Controller
             ]);
         }
 
-        return view('paid-leaves.index', compact('paidLeaves', 'summaryStats'));
+        // Get companies for Super Admin filter
+        $companies = Auth::user()->isSuperAdmin()
+            ? \App\Models\Company::latest('created_at')->get()
+            : collect();
+
+        return view('paid-leaves.index', compact('paidLeaves', 'summaryStats', 'companies'));
     }
 
     /**

@@ -32,7 +32,7 @@ class CompanyController extends Controller
             $query->where('is_active', $request->status === 'active');
         }
 
-        $companies = $query->orderBy('name')->paginate(10)->withQueryString();
+        $companies = $query->latest('created_at')->paginate(10)->withQueryString();
 
         return view('companies.index', compact('companies'));
     }
@@ -74,9 +74,9 @@ class CompanyController extends Controller
             $validated['code'] = $code;
         }
 
-        // Set default active status
+        // Set default active status to false (inactive) until users are assigned
         if (!isset($validated['is_active'])) {
-            $validated['is_active'] = true;
+            $validated['is_active'] = false;
         }
 
         $company = Company::create($validated);
@@ -102,6 +102,14 @@ class CompanyController extends Controller
      */
     public function edit(Company $company)
     {
+        // Return JSON for AJAX modal requests
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'company' => $company
+            ]);
+        }
+
         return view('companies.edit', compact('company'));
     }
 

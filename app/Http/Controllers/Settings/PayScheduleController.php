@@ -21,8 +21,13 @@ class PayScheduleController extends Controller
     {
         $this->authorize('edit settings');
 
+        // Build query with company scope
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
+        $query = DB::table('pay_schedules')
+            ->where('company_id', $workingCompanyId);
+
         // FORCE fetch from pay_schedules table directly
-        $schedules = collect(DB::table('pay_schedules')
+        $schedules = collect($query
             ->orderBy('type')
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -58,6 +63,7 @@ class PayScheduleController extends Controller
         ]);
 
         $schedule = PaySchedule::create([
+            'company_id' => Auth::user()->getWorkingCompanyId(),
             'name' => $validated['name'],
             'type' => $validated['type'],
             'cutoff_periods' => $validated['cutoff_periods'],

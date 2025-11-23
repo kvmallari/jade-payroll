@@ -33,6 +33,21 @@ class CashAdvanceController extends Controller
 
         $query = CashAdvance::with(['employee', 'requestedBy', 'approvedBy']);
 
+        // Super Admin can filter by company
+        if (Auth::user()->isSuperAdmin() && $request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $query->whereHas('employee', function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                });
+            }
+        } elseif (!Auth::user()->isSuperAdmin()) {
+            // Non-super admins see only their company's cash advances
+            $query->whereHas('employee', function ($q) {
+                $q->where('company_id', Auth::user()->company_id);
+            });
+        }
+
         // Filter by name search (employee name)
         if ($request->filled('name_search')) {
             $query->whereHas('employee', function ($q) use ($request) {
@@ -73,8 +88,25 @@ class CashAdvanceController extends Controller
 
         $employees = Employee::active()->orderBy('last_name')->get();
 
-        // Calculate summary statistics
+        // Get companies for Super Admin filter
+        $companies = Auth::user()->isSuperAdmin()
+            ? \App\Models\Company::latest('created_at')->get()
+            : collect();        // Calculate summary statistics
         $summaryQuery = CashAdvance::query();
+
+        // Apply company filter for summary
+        if (Auth::user()->isSuperAdmin() && $request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $summaryQuery->whereHas('employee', function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                });
+            }
+        } elseif (!Auth::user()->isSuperAdmin()) {
+            $summaryQuery->whereHas('employee', function ($q) {
+                $q->where('company_id', Auth::user()->company_id);
+            });
+        }
 
         // Apply same filters for summary
         if ($request->filled('name_search')) {
@@ -119,7 +151,7 @@ class CashAdvanceController extends Controller
             ]);
         }
 
-        return view('cash-advances.index', compact('cashAdvances', 'employees', 'summaryStats'));
+        return view('cash-advances.index', compact('cashAdvances', 'employees', 'summaryStats', 'companies'));
     }
 
     /**

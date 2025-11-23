@@ -46,12 +46,26 @@
                 <div class="p-6">
                     <!-- Filter Inputs and Action Buttons in 1 Row -->
                     <div class="flex flex-wrap items-end gap-4 mb-4 w-full">
+                       
                         <div class="flex-1 min-w-[180px]">
                             <label class="block text-sm font-medium text-gray-700">Name Search</label>
                             <input type="text" name="name_search" id="name_search" value="{{ request('name_search') }}" 
                                    placeholder="Search employee name..."
                                    class="mt-1 block w-full h-10 px-3 border-gray-300 rounded-md shadow-sm payroll-filter focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
+                         @if(Auth::user()->isSuperAdmin())
+                        <div class="flex-1 min-w-[180px]">
+                            <label class="block text-sm font-medium text-gray-700">Company</label>
+                            <select name="company" id="company" class="mt-1 block w-full h-10 px-3 border-gray-300 rounded-md shadow-sm payroll-filter focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">All Companies</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ strtolower($company->name) }}" {{ request('company') == strtolower($company->name) ? 'selected' : '' }}>
+                                        {{ $company->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
                         <div class="flex-1 ">
                             <label class="block text-sm font-medium text-gray-700">Pay Schedule</label>
                             <select name="pay_schedule" id="pay_schedule" class="mt-1 block w-full h-10 px-3 border-gray-300 rounded-md shadow-sm payroll-filter focus:border-indigo-500 focus:ring-indigo-500">

@@ -55,28 +55,19 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employees</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @foreach($companies as $company)
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50" 
+                                    oncontextmenu="showCompanyContextMenu(event, {{ $company->id }}, {{ json_encode($company->name) }}, '{{ $company->is_active ? 'true' : 'false' }}', '{{ (!$company->is_active && $company->users_count == 0 && $company->employees_count == 0) ? 'true' : 'false' }}'); return false;">
                                     <td class="px-6 py-4">
                                         <div class="text-sm font-medium text-gray-900">{{ $company->name }}</div>
                                         @if($company->code)
                                             <div class="text-sm text-gray-500">{{ $company->code }}</div>
-                                        @endif
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        @if($company->email)
-                                            <div class="text-sm text-gray-900">{{ $company->email }}</div>
-                                        @endif
-                                        @if($company->phone)
-                                            <div class="text-sm text-gray-500">{{ $company->phone }}</div>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900">
@@ -90,23 +81,6 @@
                                             {{ $company->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
                                             {{ $company->is_active ? 'Active' : 'Inactive' }}
                                         </span>
-                                    </td>
-                                    <td class="px-6 py-4 text-sm font-medium space-x-2">
-                                        <a href="{{ route('companies.edit', $company) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
-                                        <form action="{{ route('companies.toggle', $company) }}" method="POST" class="inline">
-                                            @csrf
-                                            <button type="submit" class="text-yellow-600 hover:text-yellow-900">
-                                                {{ $company->is_active ? 'Deactivate' : 'Activate' }}
-                                            </button>
-                                        </form>
-                                        @if($company->users_count == 0 && $company->employees_count == 0)
-                                            <form action="{{ route('companies.destroy', $company) }}" method="POST" class="inline" 
-                                                  onsubmit="return confirm('Are you sure you want to delete this company?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
-                                            </form>
-                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -153,8 +127,8 @@
                             class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
                         Cancel
                     </button>
-                    <button type="submit"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    <button type="submit" id="createCompanyBtn"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
                         Create Company
                     </button>
                 </div>
@@ -162,7 +136,260 @@
         </div>
     </div>
 
+    <!-- Edit Company Modal -->
+    <div id="editCompanyModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Edit Company</h3>
+                <button type="button" onclick="closeEditModal()" class="text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="editCompanyForm" method="POST" action="">
+                @csrf
+                @method('PUT')
+                <div class="mb-4">
+                    <label for="edit_name" class="block text-sm font-medium text-gray-700 mb-2">Company Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="name" id="edit_name" required
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                           placeholder="Enter company name">
+                    <span class="text-red-500 text-sm hidden" id="edit_name-error"></span>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeEditModal()"
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                        Cancel
+                    </button>
+                    <button type="submit" id="updateCompanyBtn"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Update Company
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Context Menu (will be dynamically created) -->
+
     <script>
+        // DEFINE ALL ESSENTIAL FUNCTIONS IMMEDIATELY to prevent ReferenceError
+        console.log('Defining company functions...');
+
+        function closeContextMenu() {
+            // Remove any context menus that might exist
+            const menus = document.querySelectorAll('#contextMenu, [id*="contextMenu"], [class*="context"]');
+            menus.forEach(menu => menu.remove());
+        }
+
+        window.handleEdit = function(companyId) {
+            console.log('Edit clicked for company:', companyId);
+            closeContextMenu();
+            
+            // Fetch company data and show modal
+            fetch(`/companies/${companyId}/edit`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Populate the edit form
+                    document.getElementById('edit_name').value = data.company.name;
+                    document.getElementById('editCompanyForm').action = `/companies/${companyId}`;
+                    
+                    // Show the modal
+                    document.getElementById('editCompanyModal').classList.remove('hidden');
+                    document.getElementById('edit_name').focus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error loading company data');
+            });
+        };
+
+        window.handleToggle = function(companyId) {
+            console.log('Toggle clicked for company:', companyId);
+            closeContextMenu();
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/companies/${companyId}/toggle`;
+            
+            const csrfToken = document.createElement('input');
+            csrfToken.type = 'hidden';
+            csrfToken.name = '_token';
+            csrfToken.value = '{{ csrf_token() }}';
+            form.appendChild(csrfToken);
+            
+            document.body.appendChild(form);
+            form.submit();
+        };
+
+        window.handleDelete = function(companyId, name) {
+            console.log('Delete clicked for company:', companyId, 'name:', name);
+            if (confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+                closeContextMenu();
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/companies/${companyId}`;
+                
+                const csrfToken = document.createElement('input');
+                csrfToken.type = 'hidden';
+                csrfToken.name = '_token';
+                csrfToken.value = '{{ csrf_token() }}';
+                form.appendChild(csrfToken);
+                
+                const methodField = document.createElement('input');
+                methodField.type = 'hidden';
+                methodField.name = '_method';
+                methodField.value = 'DELETE';
+                form.appendChild(methodField);
+                
+                document.body.appendChild(form);
+                form.submit();
+            } else {
+                closeContextMenu();
+            }
+        };
+
+        // Clear any old context menus immediately when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove any existing old context menus
+            const oldMenus = document.querySelectorAll('[id*="contextMenu"]');
+            oldMenus.forEach(menu => menu.remove());
+
+            // Add submit handlers to prevent double-clicking
+            const createForm = document.getElementById('createCompanyForm');
+            const createBtn = document.getElementById('createCompanyBtn');
+            
+            createForm.addEventListener('submit', function(e) {
+                createBtn.disabled = true;
+            });
+
+            const editForm = document.getElementById('editCompanyForm');
+            const updateBtn = document.getElementById('updateCompanyBtn');
+            
+            editForm.addEventListener('submit', function(e) {
+                updateBtn.disabled = true;
+            });
+        });
+
+        function showCompanyContextMenu(event, companyId, name, isActive, canDelete) {
+            console.log('=== RIGHT CLICK DETECTED ===');
+            console.log('Company:', companyId, 'Name:', name, 'Active:', isActive, 'Can Delete:', canDelete);
+            
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            
+            // FORCE remove ANY existing context menus
+            const allMenus = document.querySelectorAll('[id*="contextMenu"], .context-menu, [class*="context"]');
+            allMenus.forEach(menu => menu.remove());
+            
+            // Create the context menu
+            createCompanyContextMenu(event, companyId, name, isActive, canDelete);
+        }
+
+        function createCompanyContextMenu(event, companyId, name, isActive, canDelete) {
+            console.log('Creating context menu for company:', companyId, 'name:', name);
+            
+            // Create the context menu element
+            const contextMenu = document.createElement('div');
+            contextMenu.id = 'contextMenu';
+            contextMenu.className = 'fixed bg-white rounded-md shadow-xl border border-gray-200 py-1 z-50 min-w-48 backdrop-blur-sm transition-all duration-150 transform opacity-100 scale-100';
+            
+            // Create header
+            const header = document.createElement('div');
+            header.className = 'px-3 py-2 border-b border-gray-100 bg-gray-50 rounded-t-md';
+            header.innerHTML = `
+                <div class="text-sm font-medium text-gray-900">${name}</div>
+                <div class="text-xs text-gray-500">Company</div>
+            `;
+            contextMenu.appendChild(header);
+            
+            // Create actions container
+            const actionsContainer = document.createElement('div');
+            actionsContainer.className = 'py-1';
+            
+            // Create Edit button
+            const editButton = document.createElement('a');
+            editButton.href = '#';
+            editButton.className = 'flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150';
+            editButton.innerHTML = `
+                <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Edit Company
+            `;
+            editButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Edit button clicked! Company ID:', companyId);
+                handleEdit(companyId);
+            });
+            actionsContainer.appendChild(editButton);
+            
+            // Create divider
+            const divider = document.createElement('div');
+            divider.className = 'border-t border-gray-100 my-1';
+            actionsContainer.appendChild(divider);
+            
+            // Create Toggle button
+            const toggleButton = document.createElement('a');
+            toggleButton.href = '#';
+            toggleButton.className = 'flex items-center px-3 py-2 text-sm text-yellow-700 hover:bg-yellow-50 hover:text-yellow-800 transition-colors duration-150';
+            toggleButton.innerHTML = `
+                <svg class="w-4 h-4 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"></path>
+                </svg>
+                ${isActive === 'false' ? 'Activate' : 'Deactivate'}
+            `;
+            toggleButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Toggle button clicked! Company ID:', companyId);
+                handleToggle(companyId);
+            });
+            actionsContainer.appendChild(toggleButton);
+            
+            // Create Delete button (only if no users/employees)
+            if (canDelete === 'true') {
+                const deleteButton = document.createElement('a');
+                deleteButton.href = '#';
+                deleteButton.className = 'flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors duration-150';
+                deleteButton.innerHTML = `
+                    <svg class="w-4 h-4 mr-2 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Delete Company
+                `;
+                deleteButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Delete button clicked! Company ID:', companyId, 'Name:', name);
+                    handleDelete(companyId, name);
+                });
+                actionsContainer.appendChild(deleteButton);
+            }
+            
+            contextMenu.appendChild(actionsContainer);
+            document.body.appendChild(contextMenu);
+            contextMenu.style.left = event.pageX + 'px';
+            contextMenu.style.top = event.pageY + 'px';
+            
+            // Close menu when clicking elsewhere
+            document.addEventListener('click', function closeMenu() {
+                contextMenu.remove();
+                document.removeEventListener('click', closeMenu);
+            });
+        }
+
         function openCreateModal() {
             document.getElementById('createCompanyModal').classList.remove('hidden');
             document.getElementById('name').focus();
@@ -174,10 +401,17 @@
             document.getElementById('name-error').classList.add('hidden');
         }
 
+        function closeEditModal() {
+            document.getElementById('editCompanyModal').classList.add('hidden');
+            document.getElementById('editCompanyForm').reset();
+            document.getElementById('edit_name-error').classList.add('hidden');
+        }
+
         // Close modal on Escape key
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeCreateModal();
+                closeEditModal();
             }
         });
 
@@ -185,6 +419,12 @@
         document.getElementById('createCompanyModal')?.addEventListener('click', function(event) {
             if (event.target === this) {
                 closeCreateModal();
+            }
+        });
+
+        document.getElementById('editCompanyModal')?.addEventListener('click', function(event) {
+            if (event.target === this) {
+                closeEditModal();
             }
         });
 

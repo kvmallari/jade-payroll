@@ -16,6 +16,7 @@ class PaySchedule extends Model
     protected $table = 'pay_schedules';
 
     protected $fillable = [
+        'company_id',
         'name',
         'type',
         'description',

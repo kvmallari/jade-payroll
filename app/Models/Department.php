@@ -12,6 +12,7 @@ class Department extends Model
     use HasFactory, LogsActivity;
 
     protected $fillable = [
+        'company_id',
         'name',
         'code',
         'description',

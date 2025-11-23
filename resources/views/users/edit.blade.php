@@ -25,7 +25,16 @@
                         <div>
                             <label for="email" class="block text-sm font-medium text-gray-700">Email Address <span class="text-red-500">*</span></label>
                             <input type="email" name="email" id="email" value="{{ old('email', $user->email) }}" required
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('email') border-red-500 @enderror">
+                                   {{ $user->authorized_email ? 'readonly' : '' }}
+                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('email') border-red-500 @enderror {{ $user->authorized_email ? 'bg-gray-100 cursor-not-allowed' : '' }}">
+                            @if($user->authorized_email)
+                                <p class="mt-1 text-xs text-gray-500">
+                                    <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Email is locked to this role and cannot be changed
+                                </p>
+                            @endif
                             @error('email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror

@@ -34,23 +34,34 @@ class EmployerSetting extends Model
     }
 
     /**
-     * Get the singleton instance of employer settings
+     * Get the singleton instance of employer settings for the current user's company
      */
-    public static function getSettings()
+    public static function getSettings($companyId = null)
     {
-        return static::first() ?: new static();
+        $query = static::query();
+
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        }
+
+        return $query->first() ?: new static(['company_id' => $companyId]);
     }
 
     /**
-     * Update or create employer settings
+     * Update or create employer settings for a specific company
      */
-    public static function updateSettings(array $data)
+    public static function updateSettings(array $data, $companyId = null)
     {
-        $settings = static::first();
+        if ($companyId) {
+            $settings = static::where('company_id', $companyId)->first();
+        } else {
+            $settings = static::first();
+        }
 
         if ($settings) {
             $settings->update($data);
         } else {
+            $data['company_id'] = $companyId;
             $settings = static::create($data);
         }
 

@@ -12,6 +12,7 @@ class Position extends Model
     use HasFactory, LogsActivity;
 
     protected $fillable = [
+        'company_id',
         'department_id',
         'title',
         'description',

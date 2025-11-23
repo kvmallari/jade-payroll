@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PayrollRateConfiguration;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class PayrollRateConfigurationController extends Controller
 {
@@ -12,7 +13,10 @@ class PayrollRateConfigurationController extends Controller
      */
     public function index()
     {
-        $configurations = PayrollRateConfiguration::ordered()->get();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
+        $configurations = PayrollRateConfiguration::ordered()
+            ->where('company_id', $workingCompanyId)
+            ->get();
 
         return view('admin.payroll-rate-configurations.index', compact('configurations'));
     }
@@ -45,6 +49,9 @@ class PayrollRateConfigurationController extends Controller
         $validated['overtime_rate_multiplier'] = $validated['overtime_rate_multiplier'] / 100;
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
+
+        // Auto-assign company_id
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         PayrollRateConfiguration::create($validated);
 

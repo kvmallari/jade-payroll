@@ -12,6 +12,19 @@
                 <div class="p-6 bg-white border-b border-gray-200">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Filter Reports</h3>
                     <div class="flex flex-wrap gap-4 items-end">
+                        @if(Auth::user()->isSuperAdmin())
+                        <div class="flex-1 min-w-32">
+                            <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
+                            <select name="company" id="company" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="">All Companies</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ strtolower($company->name) }}" {{ request('company') == strtolower($company->name) ? 'selected' : '' }}>
+                                        {{ $company->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
                         <div class="flex-1 min-w-32">
                             <label for="year" class="block text-sm font-medium text-gray-700">Year</label>
                             <select name="year" id="year" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -154,6 +167,10 @@
             }
 
             // Add event listeners for live filtering
+            const companySelect = document.getElementById('company');
+            if (companySelect) {
+                companySelect.addEventListener('change', updateFilters);
+            }
             if (yearSelect) {
                 yearSelect.addEventListener('change', updateFilters);
             }

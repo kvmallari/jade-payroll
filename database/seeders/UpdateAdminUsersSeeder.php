@@ -31,6 +31,7 @@ class UpdateAdminUsersSeeder extends Seeder
                 'email' => 'superadmin@jadepayroll.com',
                 'password' => Hash::make('password'),
                 'company_id' => null, // No specific company - manages all
+                'authorized_email' => 'superadmin@jadepayroll.com', // Lock email to prevent role manipulation
             ]);
             $this->command->info('Updated Super Administrator: superadmin@jadepayroll.com');
         }
@@ -43,6 +44,7 @@ class UpdateAdminUsersSeeder extends Seeder
                 'email' => 'hrhead.default@jadepayroll.com',
                 'password' => Hash::make('password'),
                 'company_id' => $defaultCompany->id,
+                'authorized_email' => 'hrhead.default@jadepayroll.com', // Lock email to prevent role manipulation
             ]);
             $this->command->info('Updated HR Head: hrhead.default@jadepayroll.com');
         }
@@ -55,6 +57,7 @@ class UpdateAdminUsersSeeder extends Seeder
                 'email' => 'hrstaff.default@jadepayroll.com',
                 'password' => Hash::make('password'),
                 'company_id' => $defaultCompany->id,
+                'authorized_email' => 'hrstaff.default@jadepayroll.com', // Lock email to prevent role manipulation
             ]);
             $this->command->info('Updated HR Staff: hrstaff.default@jadepayroll.com');
         }

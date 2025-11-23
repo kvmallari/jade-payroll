@@ -18,6 +18,7 @@ use App\Http\Controllers\EmploymentTypeController;
 use App\Http\Controllers\TimeScheduleController;
 use App\Http\Controllers\DayScheduleController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\CompanySelectorController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -37,6 +38,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Company Selector (Super Admin only)
+    Route::post('/company/select', [CompanySelectorController::class, 'setCompany'])->name('company.select');
+    Route::post('/company/clear', [CompanySelectorController::class, 'clearCompany'])->name('company.clear');
 
     // Employee Management
     Route::middleware('can:view employees')->group(function () {

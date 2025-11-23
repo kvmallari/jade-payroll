@@ -10,6 +10,7 @@ class TimeSchedule extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'name',
         'time_in',
         'time_out',

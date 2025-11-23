@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Models\DeductionTaxSetting;
 use App\Models\Payroll;
 use App\Models\PayrollDetail;
@@ -19,9 +20,20 @@ class ReportsController extends Controller
 
         // Base query for payroll snapshots - only include PAID payrolls
         $query = \App\Models\PayrollSnapshot::join('payrolls', 'payroll_snapshots.payroll_id', '=', 'payrolls.id')
+            ->join('employees', 'payroll_snapshots.employee_id', '=', 'employees.id')
             ->whereYear('payrolls.period_start', $year)
             ->where('payrolls.is_paid', true) // Only include paid payrolls
             ->whereNotNull('payroll_snapshots.employer_deductions_breakdown'); // Only include snapshots with employer breakdown
+
+        // Company filtering for Super Admin
+        if (Auth::user()->isSuperAdmin() && $request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $query->where('employees.company_id', $company->id);
+            }
+        } elseif (!Auth::user()->isSuperAdmin()) {
+            $query->where('employees.company_id', Auth::user()->company_id);
+        }
 
         // Apply month filter if provided
         if ($month) {
@@ -42,10 +54,26 @@ class ReportsController extends Controller
             $allDeductions->push($virtualWithholdingTax);
         }
 
+        // Group deductions by normalized name to avoid duplicates
+        $uniqueDeductions = collect();
+        $processedNames = [];
+
+        foreach ($allDeductions as $deduction) {
+            $normalizedName = strtolower(str_replace([' ', '-'], '', $deduction->name));
+
+            // Skip if we already processed this deduction type
+            if (in_array($normalizedName, $processedNames)) {
+                continue;
+            }
+
+            $processedNames[] = $normalizedName;
+            $uniqueDeductions->push($deduction);
+        }
+
         // Calculate totals for each deduction type
         $shareData = collect();
 
-        foreach ($allDeductions as $deduction) {
+        foreach ($uniqueDeductions as $deduction) {
             // Get employee share from deductions_breakdown JSON field
             $eeShare = 0;
             $payrollCount = 0;
@@ -196,13 +224,16 @@ class ReportsController extends Controller
             ]);
         }
 
+        $companies = Auth::user()->isSuperAdmin() ? \App\Models\Company::latest('created_at')->get() : collect();
+
         return view('reports.employer-shares', compact(
             'shareData',
             'grandTotals',
             'payrollPeriod',
             'year',
             'month',
-            'availableYears'
+            'availableYears',
+            'companies'
         ));
     }
 

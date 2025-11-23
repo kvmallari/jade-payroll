@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Position;
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class PositionController extends Controller
@@ -14,8 +15,10 @@ class PositionController extends Controller
      */
     public function index()
     {
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
         $positions = Position::with(['department', 'employees'])
             ->withCount('employees')
+            ->where('company_id', $workingCompanyId)
             ->orderBy('title')
             ->get();
 
@@ -27,7 +30,11 @@ class PositionController extends Controller
      */
     public function create()
     {
-        $departments = Department::active()->orderBy('name')->get();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
+        $departments = Department::active()
+            ->where('company_id', $workingCompanyId)
+            ->orderBy('name')
+            ->get();
 
         return response()->json([
             'message' => 'Create form data',
@@ -47,6 +54,9 @@ class PositionController extends Controller
             'department_id' => 'nullable|exists:departments,id',
             'is_active' => 'boolean',
         ]);
+
+        // Auto-assign company_id
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         $position = Position::create($validated);
 
@@ -75,7 +85,11 @@ class PositionController extends Controller
      */
     public function edit(Position $position)
     {
-        $departments = Department::active()->orderBy('name')->get();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
+        $departments = Department::active()
+            ->where('company_id', $workingCompanyId)
+            ->orderBy('name')
+            ->get();
 
         return response()->json([
             'message' => 'Edit form data',

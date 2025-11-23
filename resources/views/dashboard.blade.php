@@ -506,7 +506,7 @@
                                 </a>
                             @endcan
                             
-                            @if(Auth::user()->hasRole(['System Administrator', 'HR Head', 'HR Staff']))
+                            @if(Auth::user()->hasRole(['Super Admin', 'System Administrator', 'HR Head', 'HR Staff']))
                                 <a href="{{ url('/payrolls/automation') }}" class="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition">
                                     <span class="text-green-600 mr-3">⚙️</span>
                                     <span class="text-green-700 font-medium">Automate Payroll</span>

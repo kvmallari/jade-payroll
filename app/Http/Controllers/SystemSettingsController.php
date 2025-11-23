@@ -3,23 +3,35 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Models\SystemLicense;
 use App\Models\Employee;
+use App\Models\Company;
 
 class SystemSettingsController extends Controller
 {
     /**
      * Display the system settings page.
+     * Restricted to System Administrator role only.
      */
     public function index()
     {
+        // Restrict to System Administrator only
+        if (!Auth::user()->hasRole('System Administrator')) {
+            abort(403, 'Access denied. This page is only available to System Administrators.');
+        }
+
         // Get current theme preference from session or default to 'light'
         $currentTheme = session('theme', 'light');
 
-        // Get current license information
-        $currentLicense = SystemLicense::current();
-        $employeeCount = Employee::count();
+        // Get current user's company
+        $user = Auth::user();
+        $company = $user->company;
+        
+        // Get company-specific license information (using license_key from companies table)
+        $currentLicense = SystemLicense::current(); // This will still work for now
+        $employeeCount = Employee::where('company_id', $user->company_id)->count();
 
         $settings = [
             'appearance' => [
@@ -36,7 +48,7 @@ class SystemSettingsController extends Controller
             ],
         ];
 
-        return view('system-settings.index', compact('settings', 'currentLicense', 'employeeCount'));
+        return view('system-settings.index', compact('settings', 'currentLicense', 'employeeCount', 'company'));
     }
 
     /**

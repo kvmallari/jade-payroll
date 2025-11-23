@@ -11,12 +11,9 @@ class PaidLeaveSettingController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
 
-        $leaveSettings = PaidLeaveSetting::query()
-            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
-                $query->where('company_id', $user->company_id);
-            })
+        $leaveSettings = PaidLeaveSetting::where('company_id', $workingCompanyId)
             ->orderBy('sort_order')
             ->get();
 
@@ -51,7 +48,7 @@ class PaidLeaveSettingController extends Controller
 
         $validated['code'] = $code;
         $validated['is_active'] = true; // Always active by default
-        $validated['company_id'] = Auth::user()->company_id;
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         PaidLeaveSetting::create($validated);
 

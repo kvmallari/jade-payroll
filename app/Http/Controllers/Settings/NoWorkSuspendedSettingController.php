@@ -14,13 +14,10 @@ class NoWorkSuspendedSettingController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
 
         // Get all suspensions ordered by date (latest first), maintain this order throughout
-        $allSuspensions = NoWorkSuspendedSetting::query()
-            ->when(!$user->isSuperAdmin(), function ($query) use ($user) {
-                $query->where('company_id', $user->company_id);
-            })
+        $allSuspensions = NoWorkSuspendedSetting::where('company_id', $workingCompanyId)
             ->orderBy('date_from', 'desc')
             ->get();
 
@@ -97,7 +94,7 @@ class NoWorkSuspendedSettingController extends Controller
         }
 
         // Add company_id from logged in user
-        $validated['company_id'] = Auth::user()->company_id;
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         NoWorkSuspendedSetting::create($validated);
 

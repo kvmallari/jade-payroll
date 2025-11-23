@@ -28,6 +28,7 @@ class User extends Authenticatable
         'status',
         'role',
         'company_id',
+        'authorized_email',
     ];
 
     /**
@@ -130,5 +131,38 @@ class User extends Authenticatable
     public function isSystemAdmin(): bool
     {
         return $this->hasRole(['Super Admin', 'System Administrator']);
+    }
+
+    /**
+     * Get the working company ID (for Super Admin, uses selected company from session)
+     */
+    public function getWorkingCompanyId(): ?int
+    {
+        if ($this->isSuperAdmin()) {
+            // For Super Admin, use selected company from session, or fall back to their company
+            return session('selected_company_id') ?? $this->company_id;
+        }
+        
+        // For all other users, use their assigned company
+        return $this->company_id;
+    }
+
+    /**
+     * Validate that the user's role matches their authorized email
+     * This prevents role manipulation via direct database changes
+     */
+    public function validateRoleEmailMatch(): bool
+    {
+        // If authorized_email is set, current email must match it
+        if ($this->authorized_email && $this->email !== $this->authorized_email) {
+            return false;
+        }
+
+        // Super Admin MUST have the specific email
+        if ($this->hasRole('Super Admin') && $this->email !== 'superadmin@jadepayroll.com') {
+            return false;
+        }
+
+        return true;
     }
 }

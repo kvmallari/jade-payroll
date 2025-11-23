@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class DepartmentController extends Controller
@@ -13,8 +14,10 @@ class DepartmentController extends Controller
      */
     public function index()
     {
+        $workingCompanyId = Auth::user()->getWorkingCompanyId();
         $departments = Department::with('employees')
             ->withCount('employees')
+            ->where('company_id', $workingCompanyId)
             ->orderBy('name')
             ->get();
 
@@ -42,6 +45,9 @@ class DepartmentController extends Controller
             'code' => 'nullable|string|max:10|unique:departments',
             'is_active' => 'boolean',
         ]);
+
+        // Auto-assign company_id
+        $validated['company_id'] = Auth::user()->getWorkingCompanyId();
 
         $department = Department::create($validated);
 
