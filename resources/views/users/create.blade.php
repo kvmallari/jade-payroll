@@ -5,6 +5,9 @@
     <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
         <form method="POST" action="{{ route('users.store') }}" class="space-y-6">
             @csrf
+            @if(request('company'))
+                <input type="hidden" name="company" value="{{ request('company') }}">
+            @endif
 
             <!-- Account Information -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
@@ -23,7 +26,18 @@
 
                         <div>
                             <label for="email" class="block text-sm font-medium text-gray-700">Email Address <span class="text-red-500">*</span></label>
-                            <input type="email" name="email" id="email" value="{{ old('email') }}" required
+                            @php
+                                // Get email domain from settings or use default
+                                $emailDomain = \App\Models\Setting::get('email_domain', 'jadepayroll.com');
+                                
+                                // Detect environment based on current URL
+                                $currentDomain = request()->getHost();
+                                $isLocal = $currentDomain === 'localhost' || str_contains($currentDomain, '127.0.0.1');
+                                
+                                // Use configured domain for local, actual domain for production
+                                $activeDomain = $isLocal ? $emailDomain : $currentDomain;
+                            @endphp
+                            <input type="text" name="email" id="email" value="&#64;{{ $activeDomain }}" required
                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('email') border-red-500 @enderror">
                             @error('email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -33,15 +47,30 @@
                         @if(auth()->user()->isSuperAdmin())
                         <div class="md:col-span-2">
                             <label for="company_id" class="block text-sm font-medium text-gray-700">Company <span class="text-red-500">*</span></label>
+                            @php
+                                $preselectedCompany = null;
+                                if (request('company')) {
+                                    $preselectedCompany = $companies->first(function($c) {
+                                        return strtolower($c->name) === strtolower(request('company'));
+                                    });
+                                }
+                                $isPreselected = $preselectedCompany !== null;
+                            @endphp
                             <select name="company_id" id="company_id" required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('company_id') border-red-500 @enderror">
+                                    {{ $isPreselected ? 'disabled' : '' }}
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm {{ $isPreselected ? 'bg-gray-100' : '' }} @error('company_id') border-red-500 @enderror">
                                 <option value="">Select a company</option>
                                 @foreach($companies as $company)
-                                    <option value="{{ $company->id }}" {{ old('company_id') == $company->id ? 'selected' : '' }}>
+                                    <option value="{{ $company->id }}" 
+                                        {{ ($isPreselected && $company->id === $preselectedCompany->id) || old('company_id') == $company->id ? 'selected' : '' }}>
                                         {{ $company->name }}
                                     </option>
                                 @endforeach
                             </select>
+                            @if($isPreselected)
+                                <input type="hidden" name="company_id" value="{{ $preselectedCompany->id }}">
+                                <p class="mt-1 text-xs text-gray-500">Company is preselected based on your filter</p>
+                            @endif
                             @error('company_id')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -133,6 +162,105 @@
 </div>
 
 <script>
+const emailDomain = '@' + '{{ $activeDomain }}';
+const emailInput = document.getElementById('email');
+
+// Initialize the email field with domain
+if (!emailInput.value || emailInput.value === emailDomain) {
+    emailInput.value = emailDomain;
+}
+
+// Set initial value if there's an old value
+@if(old('email'))
+    emailInput.value = '{{ old('email') }}';
+@endif
+
+// Handle input to prevent domain deletion
+emailInput.addEventListener('input', function(e) {
+    const value = this.value;
+    
+    // Always ensure the domain is present
+    if (!value.includes(emailDomain)) {
+        this.value = emailDomain;
+        // Move cursor to the beginning (before @)
+        this.setSelectionRange(0, 0);
+    } else if (!value.endsWith(emailDomain)) {
+        // If domain is not at the end, fix it
+        const atIndex = value.indexOf('@');
+        if (atIndex > -1) {
+            const username = value.substring(0, atIndex);
+            this.value = username + emailDomain;
+        } else {
+            this.value = emailDomain;
+        }
+    }
+});
+
+// Handle keydown to prevent deleting the @ and domain
+emailInput.addEventListener('keydown', function(e) {
+    const value = this.value;
+    const cursorPos = this.selectionStart;
+    const atIndex = value.indexOf('@');
+    
+    // Prevent deletion of @ and anything after it
+    if (atIndex > -1) {
+        // Backspace
+        if (e.key === 'Backspace' && cursorPos <= atIndex + 1) {
+            if (cursorPos === atIndex + 1) {
+                e.preventDefault();
+                this.setSelectionRange(atIndex, atIndex);
+            }
+        }
+        // Delete
+        if (e.key === 'Delete' && cursorPos >= atIndex) {
+            e.preventDefault();
+        }
+        // Arrow right - don't allow cursor past @
+        if (e.key === 'ArrowRight' && cursorPos >= atIndex) {
+            e.preventDefault();
+        }
+        // Prevent selection of domain part
+        if (cursorPos > atIndex && this.selectionEnd > atIndex) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'Home') {
+                this.setSelectionRange(atIndex, atIndex);
+            }
+        }
+    }
+});
+
+// Handle click to prevent cursor placement after @
+emailInput.addEventListener('click', function(e) {
+    const atIndex = this.value.indexOf('@');
+    if (atIndex > -1 && this.selectionStart > atIndex) {
+        this.setSelectionRange(atIndex, atIndex);
+    }
+});
+
+// Handle selection to prevent selecting domain part
+emailInput.addEventListener('select', function(e) {
+    const atIndex = this.value.indexOf('@');
+    if (atIndex > -1 && this.selectionEnd > atIndex) {
+        this.setSelectionRange(Math.min(this.selectionStart, atIndex), atIndex);
+    }
+});
+
+// Handle paste to preserve domain
+emailInput.addEventListener('paste', function(e) {
+    e.preventDefault();
+    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+    const atIndex = this.value.indexOf('@');
+    const cursorPos = this.selectionStart;
+    
+    if (atIndex > -1 && cursorPos <= atIndex) {
+        const before = this.value.substring(0, cursorPos);
+        const after = this.value.substring(this.selectionEnd, atIndex);
+        const username = before + pastedText + after;
+        this.value = username + emailDomain;
+        const newCursorPos = (before + pastedText).length;
+        this.setSelectionRange(newCursorPos, newCursorPos);
+    }
+});
+
 function togglePassword(fieldId) {
     const field = document.getElementById(fieldId);
     const eyeIcon = document.getElementById(fieldId + '-eye');

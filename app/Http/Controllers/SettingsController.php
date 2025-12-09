@@ -179,8 +179,11 @@ class SettingsController extends Controller
     {
         $this->authorize('manage settings');
 
-        $departments = \App\Models\Department::all();
-        $positions = \App\Models\Position::with('department')->get();
+        $user = Auth::user();
+
+        // Scope data by company
+        $departments = \App\Models\Department::where('company_id', $user->company_id)->get();
+        $positions = \App\Models\Position::where('company_id', $user->company_id)->with('department')->get();
         $timeSchedules = \App\Models\TimeSchedule::all();
         $daySchedules = \App\Models\DaySchedule::all();
 

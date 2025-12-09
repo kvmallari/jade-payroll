@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -99,7 +100,22 @@ class EmployeeController extends Controller
         $endOfMonth = $currentMonth->copy()->endOfMonth();
 
         // Calculate performance metrics for active employees
-        $performanceData = Employee::where('employment_status', 'active')
+        $performanceQuery = Employee::where('employment_status', 'active');
+
+        // Apply company scope for performance metrics
+        if (!$user->isSuperAdmin()) {
+            $performanceQuery->where('company_id', $user->company_id);
+        } else {
+            // For System Administrator, apply company filter if provided
+            if ($request->filled('company')) {
+                $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+                if ($company) {
+                    $performanceQuery->where('company_id', $company->id);
+                }
+            }
+        }
+
+        $performanceData = $performanceQuery
             ->with(['timeLogs' => function ($query) use ($startOfMonth, $endOfMonth) {
                 $query->whereBetween('log_date', [$startOfMonth, $endOfMonth]);
             }])
@@ -137,6 +153,19 @@ class EmployeeController extends Controller
         // Calculate summary statistics for employees
         $summaryQuery = Employee::query();
 
+        // Apply company scope for summary statistics
+        if (!$user->isSuperAdmin()) {
+            $summaryQuery->where('company_id', $user->company_id);
+        } else {
+            // For System Administrator, apply company filter if provided
+            if ($request->filled('company')) {
+                $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+                if ($company) {
+                    $summaryQuery->where('company_id', $company->id);
+                }
+            }
+        }
+
         // Apply same filters for summary
         if ($request->filled('search')) {
             $search = $request->search;
@@ -159,36 +188,39 @@ class EmployeeController extends Controller
             $summaryQuery->where('employment_type', $request->employment_type);
         }
 
+        // Check if there are any employees matching the query
+        $hasEmployees = $summaryQuery->clone()->exists();
+
         // Employment Type Statistics
-        $employmentTypeStats = $summaryQuery->clone()
+        $employmentTypeStats = $hasEmployees ? $summaryQuery->clone()
             ->selectRaw('employment_type, COUNT(*) as count')
             ->groupBy('employment_type')
             ->pluck('count', 'employment_type')
-            ->toArray();
+            ->toArray() : [];
 
         // Benefits Status Statistics
-        $benefitsStatusStats = $summaryQuery->clone()
+        $benefitsStatusStats = $hasEmployees ? $summaryQuery->clone()
             ->selectRaw('benefits_status, COUNT(*) as count')
             ->whereNotNull('benefits_status')
             ->groupBy('benefits_status')
             ->pluck('count', 'benefits_status')
-            ->toArray();
+            ->toArray() : [];
 
         // Pay Frequency Statistics
-        $payFrequencyStats = $summaryQuery->clone()
+        $payFrequencyStats = $hasEmployees ? $summaryQuery->clone()
             ->selectRaw('pay_schedule, COUNT(*) as count')
             ->whereNotNull('pay_schedule')
             ->groupBy('pay_schedule')
             ->pluck('count', 'pay_schedule')
-            ->toArray();
+            ->toArray() : [];
 
         // Rate Type Statistics
-        $rateTypeStats = $summaryQuery->clone()
+        $rateTypeStats = $hasEmployees ? $summaryQuery->clone()
             ->selectRaw('rate_type, COUNT(*) as count')
             ->whereNotNull('rate_type')
             ->groupBy('rate_type')
             ->pluck('count', 'rate_type')
-            ->toArray();
+            ->toArray() : [];
 
         $summaryStats = [
             'employment_types' => $employmentTypeStats,
@@ -230,21 +262,11 @@ class EmployeeController extends Controller
         $roles = Role::whereIn('name', ['HR Head', 'HR Staff', 'Employee'])->get();
         $paySchedules = \App\Models\PayScheduleSetting::all();
 
-        // Get employee default settings
-        $employeeSettings = [
-            'employee_number_prefix' => Cache::get('employee_setting_employee_number_prefix', 'EMP'),
-            'auto_generate_employee_number' => Cache::get('employee_setting_auto_generate_employee_number', true),
-            'default_department_id' => Cache::get('employee_setting_default_department_id'),
-            'default_position_id' => Cache::get('employee_setting_default_position_id'),
-            'default_employment_type' => Cache::get('employee_setting_default_employment_type', 'regular'),
-            'default_employment_status' => Cache::get('employee_setting_default_employment_status', 'active'),
-            'default_time_schedule_id' => Cache::get('employee_setting_default_time_schedule_id'),
-            'default_day_schedule' => Cache::get('employee_setting_default_day_schedule', 'monday_to_friday'),
-            'default_pay_schedule' => Cache::get('employee_setting_default_pay_schedule'),
-            'default_paid_leaves' => Cache::get('employee_setting_default_paid_leaves', 15),
-        ];
+        // Get employee default settings scoped by company
+        $user = Auth::user();
+        $workingCompanyId = $user->getWorkingCompanyId();
 
-
+        $employeeSettings = $this->getEmployeeSettingsForCompany($workingCompanyId);
 
         // Generate next employee number for auto-generate mode
         $nextEmployeeNumber = '';
@@ -945,5 +967,58 @@ class EmployeeController extends Controller
             ->get(['id', 'name', 'is_default']);
 
         return response()->json($paySchedules);
+    }
+
+    /**
+     * Get employee settings scoped by company
+     */
+    private function getEmployeeSettingsForCompany($companyId)
+    {
+        // Get company code for default prefix
+        $company = \App\Models\Company::find($companyId);
+        $defaultPrefix = $company && $company->code ? $company->code : 'EMP';
+
+        $settings = [];
+        $keys = [
+            'employee_number_prefix' => $defaultPrefix,
+            'employee_number_start' => 1,
+            'auto_generate_employee_number' => true,
+            'default_department_id' => null,
+            'default_position_id' => null,
+            'default_employment_type' => 'regular',
+            'default_employment_status' => 'active',
+            'default_time_schedule_id' => null,
+            'default_day_schedule' => 'monday_to_friday',
+            'default_pay_schedule' => null,
+            'default_paid_leaves' => 15,
+        ];
+
+        foreach ($keys as $key => $default) {
+            $cacheKey = "employee_setting_{$key}_company_{$companyId}";
+            $dbKey = "employee_{$key}";
+
+            // Check cache first
+            $value = Cache::get($cacheKey);
+
+            // If not in cache, check database
+            if ($value === null) {
+                $setting = DB::table('settings')
+                    ->where('key', $dbKey)
+                    ->where('company_id', $companyId)
+                    ->first();
+
+                if ($setting) {
+                    $value = $setting->value;
+                    // Store in cache for future use
+                    Cache::put($cacheKey, $value, now()->addDays(30));
+                } else {
+                    $value = $default;
+                }
+            }
+
+            $settings[$key] = $value;
+        }
+
+        return $settings;
     }
 }

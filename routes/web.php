@@ -386,10 +386,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Settings routes
     Route::middleware('can:edit settings')->group(function () {
-        // System Settings (System Admin only)
+        // System Settings (System Admin and Super Admin)
         Route::get('system-settings', [SystemSettingsController::class, 'index'])->name('system-settings.index');
         Route::put('system-settings', [SystemSettingsController::class, 'update'])->name('system-settings.update');
         Route::post('system-settings/toggle-theme', [SystemSettingsController::class, 'toggleTheme'])->name('system-settings.toggle-theme');
+        Route::post('system-settings/update-domain', [SystemSettingsController::class, 'updateDomain'])->name('system-settings.update-domain');
 
         // Pay Schedule Settings (New Multiple Schedule System)
         Route::resource('settings/pay-schedules', \App\Http\Controllers\Settings\PayScheduleController::class)
@@ -468,6 +469,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::middleware('role:Super Admin')->group(function () {
             Route::post('companies/{company}/toggle', [\App\Http\Controllers\CompanyController::class, 'toggle'])
                 ->name('companies.toggle');
+            Route::post('companies/{company}/license-key', [\App\Http\Controllers\CompanyController::class, 'updateLicenseKey'])
+                ->name('companies.update-license-key');
             Route::resource('companies', \App\Http\Controllers\CompanyController::class);
         });
     });

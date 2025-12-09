@@ -39,6 +39,15 @@
                         </select>
                     </div>
                     <div class="flex items-center space-x-2">
+                        @if(Auth::user()->isSuperAdmin())
+                        <button type="button" id="add_user_btn" onclick="window.location.href='{{ route('users.create') }}{{ request('company') ? '?company=' . request('company') : '' }}';"
+                           class="inline-flex items-center px-4 h-10 bg-blue-600 border border-transparent rounded-md text-white text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Add User
+                        </button>
+                        @endif
                         <button type="button" id="reset_filters" class="inline-flex items-center px-4 h-10 bg-gray-600 border border-transparent rounded-md text-white text-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
                             <svg class="w-4 h-4 " fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -369,6 +378,18 @@
                 
                 form.appendChild(methodInput);
                 form.appendChild(csrfInput);
+                
+                // Add company parameter if present in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const companyParam = urlParams.get('company');
+                if (companyParam) {
+                    const companyInput = document.createElement('input');
+                    companyInput.type = 'hidden';
+                    companyInput.name = 'company';
+                    companyInput.value = companyParam;
+                    form.appendChild(companyInput);
+                }
+                
                 document.body.appendChild(form);
                 form.submit();
             }

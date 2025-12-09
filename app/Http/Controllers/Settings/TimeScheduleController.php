@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use App\Models\TimeSchedule;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class TimeScheduleController extends Controller
 {
@@ -19,7 +20,14 @@ class TimeScheduleController extends Controller
     {
         $this->authorize('edit settings');
 
-        $timeSchedules = TimeSchedule::orderBy('name')->get();
+        $user = Auth::user();
+        $query = TimeSchedule::query();
+
+        if (!$user->isSuperAdmin()) {
+            $query->where('company_id', $user->company_id);
+        }
+
+        $timeSchedules = $query->orderBy('name')->get();
 
         return response()->json($timeSchedules);
     }
@@ -81,8 +89,9 @@ class TimeScheduleController extends Controller
             $data['break_end'] = null;
         }
 
-        // Set default active status
+        // Set default active status and company_id
         $data['is_active'] = true;
+        $data['company_id'] = Auth::user()->company_id;
 
         $timeSchedule = TimeSchedule::create($data);
 

@@ -86,6 +86,9 @@ class GenerateLicenseKey extends Command
 
         $licenseKey = $this->generateLicenseKey($licenseData);
 
+        // Save to database immediately
+        $this->saveLicenseToDatabase($licenseKey, $licenseData);
+
         // Display results
         $this->info('License Key Generated Successfully!');
         $this->line('');
@@ -99,6 +102,8 @@ class GenerateLicenseKey extends Command
         $this->line('================================================================================');
         $this->info($licenseKey);
         $this->line('================================================================================');
+        $this->line('');
+        $this->line('<fg=green>✓</> License saved to database and available in system.');
 
         // Save to file for record keeping
         $this->saveLicenseRecord($licenseKey, $licenseData);
@@ -108,24 +113,26 @@ class GenerateLicenseKey extends Command
 
     private function generateLicenseKey(array $data)
     {
-        // Create compact payload with only essential data
-        $compactData = [
-            'e' => $data['max_employees'],           // employees
-            'p' => $data['price'],                   // price  
-            'd' => $data['duration_days'],           // duration
-            't' => Carbon::now()->timestamp,         // issued timestamp
-            'c' => $data['customer']                 // customer name (full)
-        ];
+        // Generate LIC-XXXXXXXX-XXXXXXXX format
+        // Create a unique hash based on the license data
+        $dataString = json_encode([
+            'e' => $data['max_employees'],
+            'p' => $data['price'],
+            'd' => $data['duration_days'],
+            't' => Carbon::now()->timestamp,
+            'c' => $data['customer'],
+            'r' => bin2hex(random_bytes(8)) // Add randomness
+        ]);
 
-        // Encode data more efficiently
-        $payload = base64_encode(json_encode($compactData));
-
-        // Generate shorter signature (first 16 characters of HMAC)
         $secret = config('app.license_secret', config('app.key'));
-        $signature = substr(hash_hmac('sha256', $payload, $secret), 0, 16);
+        $hash = hash_hmac('sha256', $dataString, $secret);
 
-        // Combine - this results in a much shorter license key
-        return $payload . '.' . $signature;
+        // Take first 8 and next 8 characters from hash, convert to uppercase
+        $part1 = strtoupper(substr($hash, 0, 8));
+        $part2 = strtoupper(substr($hash, 8, 8));
+
+        // Format: LIC-XXXXXXXX-XXXXXXXX
+        return "LIC-{$part1}-{$part2}";
     }
 
     private function saveLicenseRecord($licenseKey, $data)
@@ -157,5 +164,33 @@ class GenerateLicenseKey extends Command
         file_put_contents($filepath, json_encode($records, JSON_PRETTY_PRINT));
 
         $this->line("License record saved to: {$filepath}");
+    }
+
+    private function saveLicenseToDatabase($licenseKey, $data)
+    {
+        // Check if license already exists
+        $existing = \App\Models\SystemLicense::where('license_key', $licenseKey)->first();
+
+        if ($existing) {
+            $this->warn('License key already exists in database.');
+            return;
+        }
+
+        // Create new license record (not activated yet)
+        \App\Models\SystemLicense::create([
+            'license_key' => $licenseKey,
+            'plan_info' => [
+                'max_employees' => $data['max_employees'],
+                'price' => $data['price'],
+                'duration_days' => $data['duration_days'],
+                'currency' => 'PHP',
+                'customer' => $data['customer'],
+                'features' => $data['features'],
+            ],
+            'is_active' => false, // Not active until used
+            'activated_at' => null,
+            'expires_at' => null, // Will be set when activated
+            'server_fingerprint' => '', // Empty until activated on a server
+        ]);
     }
 }

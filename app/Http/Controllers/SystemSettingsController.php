@@ -17,9 +17,9 @@ class SystemSettingsController extends Controller
      */
     public function index()
     {
-        // Restrict to System Administrator only
-        if (!Auth::user()->hasRole('System Administrator')) {
-            abort(403, 'Access denied. This page is only available to System Administrators.');
+        // Allow both System Administrator and Super Admin
+        if (!Auth::user()->hasRole(['System Administrator', 'Super Admin'])) {
+            abort(403, 'Access denied. This page is only available to System Administrators and Super Admins.');
         }
 
         // Get current theme preference from session or default to 'light'
@@ -28,7 +28,16 @@ class SystemSettingsController extends Controller
         // Get current user's company
         $user = Auth::user();
         $company = $user->company;
-        
+
+        // Get email domain setting
+        $emailDomain = \App\Models\Setting::get('email_domain', 'jadepayroll.com');
+
+        // Detect environment based on current URL
+        $currentDomain = request()->getHost();
+        $environment = $currentDomain === 'localhost' || str_contains($currentDomain, '127.0.0.1')
+            ? 'local'
+            : $currentDomain;
+
         // Get company-specific license information (using license_key from companies table)
         $currentLicense = SystemLicense::current(); // This will still work for now
         $employeeCount = Employee::where('company_id', $user->company_id)->count();
@@ -41,6 +50,8 @@ class SystemSettingsController extends Controller
             'system' => [
                 'timezone' => config('app.timezone'),
                 'locale' => config('app.locale'),
+                'email_domain' => $emailDomain,
+                'environment' => $environment,
             ],
             'notifications' => [
                 'email_notifications' => true,
@@ -85,5 +96,25 @@ class SystemSettingsController extends Controller
             'success' => true,
             'theme' => $newTheme
         ]);
+    }
+
+    /**
+     * Update email domain setting.
+     */
+    public function updateDomain(Request $request)
+    {
+        $request->validate([
+            'email_domain' => 'required|string|max:255',
+        ]);
+
+        \App\Models\Setting::set(
+            'email_domain',
+            $request->email_domain,
+            'string',
+            'system',
+            'Default email domain for user accounts'
+        );
+
+        return redirect()->back()->with('success', 'Email domain updated successfully!');
     }
 }

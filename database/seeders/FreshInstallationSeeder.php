@@ -160,10 +160,14 @@ class FreshInstallationSeeder extends Seeder
         }
 
         // Create Roles
+        $superAdmin = Role::firstOrCreate(['name' => 'Super Admin']);
         $systemAdmin = Role::firstOrCreate(['name' => 'System Administrator']);
         $hrHead = Role::firstOrCreate(['name' => 'HR Head']);
         $hrStaff = Role::firstOrCreate(['name' => 'HR Staff']);
         $employee = Role::firstOrCreate(['name' => 'Employee']);
+
+        // Super Admin - All permissions (highest privilege)
+        $superAdmin->syncPermissions(Permission::all());
 
         // System Administrator - All permissions
         $systemAdmin->syncPermissions(Permission::all());

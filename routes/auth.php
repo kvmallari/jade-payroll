@@ -35,6 +35,10 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    // License activation routes (require authentication)
+    Route::get('/license/activate', [LicenseController::class, 'showActivation'])->name('license.activate');
+    Route::post('/license/activate', [LicenseController::class, 'activate'])->name('license.activate.store');
+
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 
@@ -62,9 +66,3 @@ Route::middleware('auth')->group(function () {
         Route::get('manage', [LicenseController::class, 'manage'])->name('manage');
     });
 });
-
-
-
-// License activation routes (accessible to both guest and authenticated users)
-Route::get('/license/activate', [LicenseController::class, 'showActivation'])->name('license.activate');
-Route::post('/license/activate', [LicenseController::class, 'activate'])->name('license.activate.store');

@@ -10,6 +10,7 @@ class EmploymentType extends Model
     use HasFactory;
 
     protected $fillable = [
+        'company_id',
         'name',
         'has_benefits',
         'description',
@@ -24,6 +25,11 @@ class EmploymentType extends Model
     public function employees()
     {
         return $this->hasMany(Employee::class, 'employment_type_id');
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function scopeActive($query)

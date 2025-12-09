@@ -50,10 +50,45 @@ class LicenseService
 
     public static function activateLicense($licenseKey)
     {
-        // Remove formatting (dashes, spaces)
-        $cleanKey = preg_replace('/[^A-Za-z0-9+\/=.]/', '', $licenseKey);
+        // Clean the license key (keep dashes for LIC- format)
+        $cleanKey = trim($licenseKey);
 
-        // Decode and validate license key
+        // Check if it's the new LIC-XXXXXXXX-XXXXXXXX format
+        if (preg_match('/^LIC-[A-F0-9]{8}-[A-F0-9]{8}$/', $cleanKey)) {
+            // New format - must exist in database
+            $existingLicense = SystemLicense::where('license_key', $cleanKey)->first();
+
+            if (!$existingLicense) {
+                return ['success' => false, 'message' => 'Invalid license key. License not found in system.'];
+            }
+
+            // Check if already activated
+            if ($existingLicense->is_active) {
+                return ['success' => false, 'message' => 'This license key has already been activated. Contact your system administrator if you need assistance.'];
+            }
+
+            // Deactivate other licenses
+            SystemLicense::where('is_active', true)->update(['is_active' => false]);
+
+            // Activate this license
+            $existingLicense->update([
+                'server_fingerprint' => self::generateServerFingerprint(),
+                'activated_at' => Carbon::now(),
+                'countdown_started_at' => Carbon::now(),
+                'expires_at' => Carbon::now()->addDays($existingLicense->plan_info['duration_days'] ?? 30),
+                'is_active' => true,
+                'system_info' => [
+                    'activated_by' => Auth::check() ? Auth::user()->email : 'system',
+                    'server_info' => $_SERVER['HTTP_HOST'] ?? 'localhost',
+                    'activation_ip' => request()->ip(),
+                ]
+            ]);
+
+            return ['success' => true, 'license' => $existingLicense];
+        }
+
+        // Old base64 format - try to decode
+        $cleanKey = preg_replace('/[^A-Za-z0-9+\/=.]/', '', $licenseKey);
         $decoded = self::decodeLicenseKey($cleanKey);
 
         if (!$decoded) {
@@ -180,5 +215,29 @@ class LicenseService
     {
         $cleaned = preg_replace('/[^A-Za-z0-9+\/=.]/', '', $licenseKey);
         return self::decodeLicenseKey($cleaned);
+    }
+
+    /**
+     * Validate if a license key exists in the system licenses table
+     */
+    public static function isValidLicenseKey($licenseKey)
+    {
+        if (empty($licenseKey)) {
+            return false;
+        }
+
+        // Clean the license key - keep dashes for LIC- format
+        $cleaned = trim($licenseKey);
+
+        // For LIC-XXXXXXXX-XXXXXXXX format, don't remove dashes
+        if (preg_match('/^LIC-[A-F0-9]{8}-[A-F0-9]{8}$/', $cleaned)) {
+            return SystemLicense::where('license_key', $cleaned)->exists();
+        }
+
+        // For old base64 format, remove special characters except base64 chars
+        $cleaned = preg_replace('/[^A-Za-z0-9+\/=.]/', '', $licenseKey);
+
+        // Check if it exists in system_licenses table
+        return SystemLicense::where('license_key', $cleaned)->exists();
     }
 }

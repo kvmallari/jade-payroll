@@ -38,12 +38,23 @@ class CompanyInitializationService
             // 6. Create default employer setting (all blank)
             $this->createDefaultEmployerSetting($company);
 
+            // 7. Create default custom deductions (Abuloy)
+            $this->createDefaultCustomDeductions($company);
+
+            // 8. Create default allowances (Transportation, 13th Month Bonus, PA Incentives)
+            $this->createDefaultAllowances($company);
+
+            // 9. Create default leaves (Vacation Leave)
+            $this->createDefaultLeaves($company);
+
+            // 10. Create default holidays (Regular Holidays)
+            $this->createDefaultHolidays($company);
+
+            // 11. Create default suspension types (Partial and Full Suspension)
+            $this->createDefaultSuspensions($company);
+
             // Note: The following are intentionally left blank for admins to configure:
             // - Departments & Positions (blank)
-            // - Allowances (blank)
-            // - Leaves (blank)
-            // - Holidays (blank)
-            // - Suspension types (blank)
             // - Time log settings (blank)
         });
     }
@@ -243,5 +254,166 @@ class CompanyInitializationService
             'signatory_name' => null,
             'signatory_designation' => null,
         ]);
+    }
+
+    /**
+     * Create default custom deductions (Abuloy)
+     */
+    private function createDefaultCustomDeductions(Company $company)
+    {
+        DeductionTaxSetting::create([
+            'company_id' => $company->id,
+            'name' => 'Abuloy',
+            'code' => 'ABULOY_' . strtoupper($company->code),
+            'type' => 'custom',
+            'category' => 'voluntary',
+            'calculation_type' => 'fixed_amount',
+            'fixed_amount' => 0,
+            'rate_percentage' => 0,
+            'description' => 'Abuloy deduction - configure amount as needed',
+            'is_active' => true,
+            'apply_to_regular' => true,
+            'apply_to_overtime' => false,
+            'apply_to_bonus' => false,
+            'apply_to_allowances' => false,
+            'apply_to_basic_pay' => false,
+            'apply_to_gross_pay' => false,
+            'apply_to_taxable_income' => false,
+            'apply_to_net_pay' => true,
+            'sort_order' => 100,
+        ]);
+    }
+
+    /**
+     * Create default allowances
+     */
+    private function createDefaultAllowances(Company $company)
+    {
+        $allowances = [
+            [
+                'name' => 'Transportation Allowance',
+                'code' => 'TRANS_ALLOW_' . strtoupper($company->code),
+                'type' => 'allowance',
+                'calculation_type' => 'fixed_amount',
+                'fixed_amount' => 0,
+                'rate_percentage' => 0,
+                'description' => 'Transportation allowance for employees',
+            ],
+            [
+                'name' => '13th Month Bonus',
+                'code' => '13TH_MONTH_' . strtoupper($company->code),
+                'type' => 'bonus',
+                'calculation_type' => 'percentage',
+                'rate_percentage' => 0,
+                'fixed_amount' => 0,
+                'description' => '13th month pay bonus',
+            ],
+            [
+                'name' => 'PA Incentives',
+                'code' => 'PA_INCENTIVES_' . strtoupper($company->code),
+                'type' => 'incentives',
+                'calculation_type' => 'fixed_amount',
+                'fixed_amount' => 0,
+                'rate_percentage' => 0,
+                'description' => 'Performance-based incentives',
+            ],
+        ];
+
+        foreach ($allowances as $index => $allowance) {
+            AllowanceBonusSetting::create(array_merge($allowance, [
+                'company_id' => $company->id,
+                'is_active' => true,
+                'is_taxable' => false,
+                'sort_order' => $index + 1,
+            ]));
+        }
+    }
+
+    /**
+     * Create default leaves
+     */
+    private function createDefaultLeaves(Company $company)
+    {
+        \App\Models\PaidLeaveSetting::create([
+            'company_id' => $company->id,
+            'name' => 'Vacation Leave',
+            'code' => 'VL_' . strtoupper($company->code),
+            'total_days' => 0,
+            'days_per_year' => 0,
+            'pay_percentage' => 100,
+            'pay_rule' => 'full',
+            'is_active' => true,
+            'description' => 'Vacation leave - configure total days as needed',
+        ]);
+    }
+
+    /**
+     * Create default holidays
+     */
+    private function createDefaultHolidays(Company $company)
+    {
+        $currentYear = date('Y');
+
+        // Add 1 example Regular Holiday
+        \App\Models\Holiday::create([
+            'company_id' => $company->id,
+            'name' => "New Year's Day",
+            'date' => "$currentYear-01-01",
+            'type' => 'regular',
+            'is_recurring' => true,
+            'is_paid' => true,
+            'is_active' => true,
+            'year' => $currentYear,
+            'description' => 'Regular holiday example - New Year\'s Day',
+        ]);
+
+        // Add 1 example Special Non-Working Holiday
+        \App\Models\Holiday::create([
+            'company_id' => $company->id,
+            'name' => 'EDSA Revolution Anniversary',
+            'date' => "$currentYear-02-25",
+            'type' => 'special_non_working',
+            'is_recurring' => true,
+            'is_paid' => true,
+            'is_active' => true,
+            'year' => $currentYear,
+            'description' => 'Special non-working holiday example - EDSA Revolution Anniversary',
+        ]);
+    }
+
+    /**
+     * Create default suspension types
+     */
+    private function createDefaultSuspensions(Company $company)
+    {
+        $currentDate = date('Y-m-d');
+        $suspensions = [
+            [
+                'type' => 'partial_suspension',
+                'name' => 'Partial Suspension',
+                'code' => 'PARTIAL_SUSP_' . strtoupper($company->code),
+                'description' => 'Partial suspension of work - configure pay rule as needed',
+            ],
+            [
+                'type' => 'full_day_suspension',
+                'name' => 'Full Suspension',
+                'code' => 'FULL_SUSP_' . strtoupper($company->code),
+                'description' => 'Full suspension of work - configure pay rule as needed',
+            ],
+        ];
+
+        foreach ($suspensions as $suspension) {
+            \App\Models\NoWorkSuspendedSetting::create([
+                'company_id' => $company->id,
+                'type' => $suspension['type'],
+                'name' => $suspension['name'],
+                'code' => $suspension['code'],
+                'description' => $suspension['description'],
+                'date_from' => $currentDate,
+                'date_to' => $currentDate,
+                'is_paid' => false,
+                'status' => 'active',
+            ]);
+        }
     }
 }

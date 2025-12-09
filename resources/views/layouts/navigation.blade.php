@@ -316,17 +316,6 @@
                                     </div>
                                 </a>
                                 
-                                <a href="{{ route('users.create') }}" 
-                                   class="flex items-center px-6 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 transition-colors duration-150 border-t border-gray-100">
-                                    <svg class="mr-4 h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                    </svg>
-                                    <div class="flex-1">
-                                        <div class="font-medium text-green-700">Create New User</div>
-                                        <div class="text-xs text-green-600 mt-1">Add HR Head, HR Staff, or System Admin</div>
-                                    </div>
-                                </a>
-                                
                                 @if(auth()->user()->isSuperAdmin())
                                 <a href="{{ route('companies.index') }}" 
                                    class="flex items-center px-6 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-800 transition-colors duration-150 border-t border-gray-100">
@@ -339,6 +328,18 @@
                                     </div>
                                 </a>
                                 @endif
+                                <a href="{{ route('users.create') }}" 
+                                   class="flex items-center px-6 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 transition-colors duration-150 border-t border-gray-100">
+                                    <svg class="mr-4 h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                    </svg>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-green-700">Create New User</div>
+                                        <div class="text-xs text-green-600 mt-1">Add HR Head, HR Staff, or System Admin</div>
+                                    </div>
+                                </a>
+                                
+                                
                             </div>
                         </div>
                     </div>
@@ -506,7 +507,7 @@
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
-                            <div>Welcome back, {{ Auth::user()->name }}</div>
+                            <div>Welcome, {{ explode(' ', Auth::user()->name)[0] }}!</div>
 
                             <div class="ms-2">
                                 <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">

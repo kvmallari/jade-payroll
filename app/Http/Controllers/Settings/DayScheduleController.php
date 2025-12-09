@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use App\Models\DaySchedule;
+use Illuminate\Support\Facades\Auth;
 
 class DayScheduleController extends Controller
 {
@@ -18,7 +19,14 @@ class DayScheduleController extends Controller
     {
         $this->authorize('edit settings');
 
-        $daySchedules = DaySchedule::orderBy('name')->get();
+        $user = Auth::user();
+        $query = DaySchedule::query();
+
+        if (!$user->isSuperAdmin()) {
+            $query->where('company_id', $user->company_id);
+        }
+
+        $daySchedules = $query->orderBy('name')->get();
 
         return response()->json($daySchedules);
     }
@@ -57,6 +65,7 @@ class DayScheduleController extends Controller
         ]);
 
         $daySchedule = DaySchedule::create([
+            'company_id' => Auth::user()->company_id,
             'name' => $request->name,
             'monday' => in_array('monday', $request->days),
             'tuesday' => in_array('tuesday', $request->days),

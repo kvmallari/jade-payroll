@@ -90,11 +90,39 @@ class PaidLeaveController extends Controller
         $paidLeaves = $query->paginate($perPage);
 
         // Calculate summary statistics
+        $summaryStatsQuery = PaidLeave::query();
+
+        // Apply company scope for summary statistics
+        if (Auth::user()->isSuperAdmin() && $request->filled('company')) {
+            $company = \App\Models\Company::whereRaw('LOWER(name) = ?', [strtolower($request->company)])->first();
+            if ($company) {
+                $summaryStatsQuery->whereHas('employee', function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                });
+            }
+        } elseif (!Auth::user()->isSuperAdmin()) {
+            // Non-super admins see only their company's statistics
+            $summaryStatsQuery->whereHas('employee', function ($q) {
+                $q->where('company_id', Auth::user()->company_id);
+            });
+        }
+
+        // If employee user, only show their own statistics
+        if (Auth::user()->hasRole('Employee')) {
+            $employee = Auth::user()->employee;
+            if ($employee) {
+                $summaryStatsQuery->where('employee_id', $employee->id);
+            } else {
+                // If no employee record found, return empty results
+                $summaryStatsQuery->where('employee_id', 0);
+            }
+        }
+
         $summaryStats = [
-            'total_approved_amount' => PaidLeave::where('status', 'approved')->sum('total_amount'),
-            'total_approved_leave' => PaidLeave::where('status', 'approved')->count(),
-            'total_pending_amount' => PaidLeave::where('status', 'pending')->sum('total_amount'),
-            'total_pending_leave' => PaidLeave::where('status', 'pending')->count(),
+            'total_approved_amount' => $summaryStatsQuery->clone()->where('status', 'approved')->sum('total_amount'),
+            'total_approved_leave' => $summaryStatsQuery->clone()->where('status', 'approved')->count(),
+            'total_pending_amount' => $summaryStatsQuery->clone()->where('status', 'pending')->sum('total_amount'),
+            'total_pending_leave' => $summaryStatsQuery->clone()->where('status', 'pending')->count(),
         ];
 
         // Handle AJAX requests

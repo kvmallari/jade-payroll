@@ -19,21 +19,21 @@ class EmployeeSettingController extends Controller
 {
     public function index()
     {
-        $settings = $this->getEmployeeSettings();
-        
         // Scope data to user's working company
         $user = Auth::user();
         $workingCompanyId = $user->getWorkingCompanyId();
-        
+
+        $settings = $this->getEmployeeSettings($workingCompanyId);
+
         $departmentsQuery = Department::where('company_id', $workingCompanyId);
         $positionsQuery = Position::with('department')->where('company_id', $workingCompanyId);
-        
+
         $departments = $departmentsQuery->get();
         $positions = $positionsQuery->get();
         $timeSchedules = TimeSchedule::all();
         $daySchedules = DaySchedule::all();
         $paySchedules = PayScheduleSetting::all();
-        $employmentTypes = EmploymentType::all();
+        $employmentTypes = EmploymentType::where('company_id', $workingCompanyId)->get();
 
         return view('settings.employee-settings.index', compact(
             'settings',
@@ -44,8 +44,12 @@ class EmployeeSettingController extends Controller
             'paySchedules',
             'employmentTypes'
         ));
-    }    public function update(Request $request)
+    }
+    public function update(Request $request)
     {
+        $user = Auth::user();
+        $workingCompanyId = $user->getWorkingCompanyId();
+
         $validated = $request->validate([
             'employee_number_prefix' => 'required|string|max:10',
             'employee_number_start' => 'required|integer|min:1',
@@ -64,13 +68,17 @@ class EmployeeSettingController extends Controller
             'allow_custom_employee_number' => 'boolean',
         ]);
 
-        // Store settings in cache and database
+        // Store settings in cache and database scoped by company
         foreach ($validated as $key => $value) {
-            Cache::put("employee_setting_{$key}", $value, now()->addDays(30));
+            $cacheKey = "employee_setting_{$key}_company_{$workingCompanyId}";
+            Cache::put($cacheKey, $value, now()->addDays(30));
 
-            // Also store in settings table if you have one
+            // Store in settings table with company_id
             DB::table('settings')->updateOrInsert(
-                ['key' => "employee_{$key}"],
+                [
+                    'key' => "employee_{$key}",
+                    'company_id' => $workingCompanyId
+                ],
                 ['value' => $value, 'updated_at' => now()]
             );
         }
@@ -78,24 +86,58 @@ class EmployeeSettingController extends Controller
         return redirect()->back()->with('success', 'Employee settings updated successfully!');
     }
 
-    private function getEmployeeSettings()
+    private function getEmployeeSettings($companyId)
     {
-        return [
-            'employee_number_prefix' => Cache::get('employee_setting_employee_number_prefix', 'EMP'),
-            'employee_number_start' => Cache::get('employee_setting_employee_number_start', 1),
-            'auto_generate_employee_number' => Cache::get('employee_setting_auto_generate_employee_number', true),
-            'default_department_id' => Cache::get('employee_setting_default_department_id'),
-            'default_position_id' => Cache::get('employee_setting_default_position_id'),
-            'default_employment_type' => Cache::get('employee_setting_default_employment_type', 'regular'),
-            'default_employment_status' => Cache::get('employee_setting_default_employment_status', 'active'),
-            'default_time_schedule_id' => Cache::get('employee_setting_default_time_schedule_id'),
-            'default_day_schedule' => Cache::get('employee_setting_default_day_schedule', 'monday_to_friday'),
-            'default_pay_schedule' => Cache::get('employee_setting_default_pay_schedule'),
-            'default_paid_leaves' => Cache::get('employee_setting_default_paid_leaves', 15),
-            'require_department' => Cache::get('employee_setting_require_department', true),
-            'require_position' => Cache::get('employee_setting_require_position', true),
-            'require_time_schedule' => Cache::get('employee_setting_require_time_schedule', true),
+        // Get company code for default prefix
+        $company = \App\Models\Company::find($companyId);
+        $defaultPrefix = $company && $company->code ? $company->code : 'EMP';
+
+        // Try cache first, then database, then default
+        $settings = [];
+        $keys = [
+            'employee_number_prefix' => $defaultPrefix,
+            'employee_number_start' => 1,
+            'auto_generate_employee_number' => true,
+            'default_department_id' => null,
+            'default_position_id' => null,
+            'default_employment_type' => 'regular',
+            'default_employment_status' => 'active',
+            'default_time_schedule_id' => null,
+            'default_day_schedule' => 'monday_to_friday',
+            'default_pay_schedule' => null,
+            'default_paid_leaves' => 15,
+            'require_department' => true,
+            'require_position' => true,
+            'require_time_schedule' => true,
         ];
+
+        foreach ($keys as $key => $default) {
+            $cacheKey = "employee_setting_{$key}_company_{$companyId}";
+            $dbKey = "employee_{$key}";
+
+            // Check cache first
+            $value = Cache::get($cacheKey);
+
+            // If not in cache, check database
+            if ($value === null) {
+                $setting = DB::table('settings')
+                    ->where('key', $dbKey)
+                    ->where('company_id', $companyId)
+                    ->first();
+
+                if ($setting) {
+                    $value = $setting->value;
+                    // Store in cache for future use
+                    Cache::put($cacheKey, $value, now()->addDays(30));
+                } else {
+                    $value = $default;
+                }
+            }
+
+            $settings[$key] = $value;
+        }
+
+        return $settings;
     }
 
     public function getNextEmployeeNumber()

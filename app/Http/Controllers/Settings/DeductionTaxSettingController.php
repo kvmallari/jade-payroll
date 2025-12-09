@@ -35,13 +35,12 @@ class DeductionTaxSettingController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:deduction_tax_settings,code',
             'description' => 'nullable|string',
             'type' => 'required|in:government,loan,custom',
-            'category' => 'required|in:mandatory,voluntary',
+            'category' => 'nullable|in:mandatory,voluntary',
             'calculation_type' => 'required|in:percentage,fixed_amount,bracket,sss_table,philhealth_table,pagibig_table,withholding_tax_table',
             'frequency' => 'required|in:per_payroll,monthly,quarterly,annually',
-            'distribution_method' => 'required|in:last_payroll,equally_distributed',
+            'distribution_method' => 'nullable|in:last_payroll,equally_distributed',
             'tax_table_type' => 'nullable|in:sss,philhealth,pagibig,withholding_tax',
             'rate_percentage' => 'nullable|numeric|min:0|max:100',
             'fixed_amount' => 'nullable|numeric|min:0',
@@ -65,6 +64,14 @@ class DeductionTaxSettingController extends Controller
             'sort_order' => 'nullable|integer',
             'benefit_eligibility' => 'required|in:both,with_benefits,without_benefits',
         ]);
+
+        // Auto-generate code from name if not provided
+        $validated['code'] = $this->generateCode($validated['name']);
+
+        // Set default category if not provided
+        if (!isset($validated['category'])) {
+            $validated['category'] = 'mandatory';
+        }
 
         // Convert tax table types to bracket with appropriate tax_table_type
         if (in_array($validated['calculation_type'], ['sss_table', 'philhealth_table', 'pagibig_table', 'withholding_tax_table'])) {
@@ -115,10 +122,10 @@ class DeductionTaxSettingController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'type' => 'required|in:government,loan,custom',
-            'category' => 'required|in:mandatory,voluntary',
+            'category' => 'nullable|in:mandatory,voluntary',
             'calculation_type' => 'required|in:percentage,fixed_amount,bracket,sss_table,philhealth_table,pagibig_table,withholding_tax_table',
             'frequency' => 'required|in:per_payroll,monthly,quarterly,annually',
-            'distribution_method' => 'required|in:last_payroll,equally_distributed',
+            'distribution_method' => 'nullable|in:last_payroll,equally_distributed',
             'tax_table_type' => 'nullable|in:sss,philhealth,pagibig,withholding_tax',
             'rate_percentage' => 'nullable|numeric|min:0|max:100',
             'fixed_amount' => 'nullable|numeric|min:0',
@@ -308,5 +315,25 @@ class DeductionTaxSettingController extends Controller
                 ];
             })
         ]);
+    }
+
+    /**
+     * Generate a unique code from the deduction name
+     */
+    private function generateCode($name)
+    {
+        // Convert to uppercase and remove special characters
+        $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '_', $name));
+
+        // Ensure uniqueness
+        $originalCode = $code;
+        $counter = 1;
+
+        while (DeductionTaxSetting::where('code', $code)->exists()) {
+            $code = $originalCode . '_' . $counter;
+            $counter++;
+        }
+
+        return substr($code, 0, 50); // Limit to 50 characters
     }
 }

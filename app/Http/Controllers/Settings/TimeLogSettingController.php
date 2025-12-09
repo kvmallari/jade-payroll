@@ -9,6 +9,7 @@ use App\Models\DaySchedule;
 use App\Models\TimeSchedule;
 use App\Models\Employee;
 use App\Models\NightDifferentialSetting;
+use Illuminate\Support\Facades\Auth;
 
 class TimeLogSettingController extends Controller
 {
@@ -21,25 +22,43 @@ class TimeLogSettingController extends Controller
     {
         $this->authorize('edit settings');
 
-        // Get all day schedules
-        $daySchedules = DaySchedule::orderBy('name')->get();
+        $user = Auth::user();
 
-        // Get all time schedules
-        $timeSchedules = TimeSchedule::orderBy('name')->get();
+        // Get day schedules filtered by company
+        $dayQuery = DaySchedule::query();
+        if (!$user->isSuperAdmin()) {
+            $dayQuery->where('company_id', $user->company_id);
+        }
+        $daySchedules = $dayQuery->orderBy('name')->get();
+
+        // Get time schedules filtered by company
+        $timeQuery = TimeSchedule::query();
+        if (!$user->isSuperAdmin()) {
+            $timeQuery->where('company_id', $user->company_id);
+        }
+        $timeSchedules = $timeQuery->orderBy('name')->get();
 
         // Get all active employees
         $employees = Employee::with('user')->active()->orderBy('employee_number')->get();
 
-        // Get grace period settings from database
-        $gracePeriodSettings = \App\Models\GracePeriodSetting::current();
+        // Get grace period settings from database filtered by company
+        $gracePeriodQuery = \App\Models\GracePeriodSetting::query();
+        if (!$user->isSuperAdmin()) {
+            $gracePeriodQuery->where('company_id', $user->company_id);
+        }
+        $gracePeriodSettings = $gracePeriodQuery->first() ?? \App\Models\GracePeriodSetting::getDefault();
         $gracePeriodData = [
-            'late_grace_minutes' => $gracePeriodSettings->late_grace_minutes,
-            'undertime_grace_minutes' => $gracePeriodSettings->undertime_grace_minutes,
+            'late_grace_minutes' => $gracePeriodSettings->late_grace_minutes ?? 0,
+            'undertime_grace_minutes' => $gracePeriodSettings->undertime_grace_minutes ?? 0,
             // overtime_threshold_minutes removed - now schedule-specific
         ];
 
-        // Get night differential settings
-        $nightDifferentialSetting = NightDifferentialSetting::currentSetting();
+        // Get night differential settings filtered by company
+        $nightQuery = NightDifferentialSetting::query();
+        if (!$user->isSuperAdmin()) {
+            $nightQuery->where('company_id', $user->company_id);
+        }
+        $nightDifferentialSetting = $nightQuery->where('is_active', true)->first();
 
         // Provide default values if no setting exists
         if (!$nightDifferentialSetting) {

@@ -1,4 +1,4 @@
-    <?php
+<?php
 
 namespace App\Http\Controllers;
 
@@ -172,7 +172,13 @@ class UserController extends Controller
             }
         });
 
-        return redirect()->route('users.index')->with('success', 'User created successfully.');
+        // Build redirect URL with company parameter if present
+        $redirectParams = [];
+        if ($request->has('company')) {
+            $redirectParams['company'] = $request->input('company');
+        }
+
+        return redirect()->route('users.index', $redirectParams)->with('success', 'User created successfully.');
     }
 
     /**
@@ -192,12 +198,12 @@ class UserController extends Controller
 
         // Prevent editing Super Admin
         if ($user->hasRole('Super Admin')) {
-            return redirect()->route('users.index')->with('error', 'Cannot edit the Super Admin account.');
+            return redirect()->route('users.index', request()->only('company'))->with('error', 'Cannot edit the Super Admin account.');
         }
 
         // System Admin can only edit users from their company
         if (!$authUser->isSuperAdmin() && $user->company_id !== $authUser->company_id) {
-            return redirect()->route('users.index')->with('error', 'You can only edit users from your company.');
+            return redirect()->route('users.index', request()->only('company'))->with('error', 'You can only edit users from your company.');
         }
 
         // Only allow editing these roles (exclude Super Admin)
@@ -295,7 +301,7 @@ class UserController extends Controller
             $user->syncRoles([$request->role]);
         });
 
-        return redirect()->route('users.index')->with('success', 'User updated successfully.');
+        return redirect()->route('users.index', request()->only('company'))->with('success', 'User updated successfully.');
     }
 
     /**
@@ -305,26 +311,39 @@ class UserController extends Controller
     {
         $authUser = Auth::user();
 
+        // Build redirect params
+        $redirectParams = [];
+        if (request()->has('company')) {
+            $redirectParams['company'] = request()->input('company');
+        }
+
         // Prevent deleting Super Admin
         if ($user->hasRole('Super Admin')) {
-            return redirect()->route('users.index')->with('error', 'Cannot delete the Super Admin account.');
+            return redirect()->route('users.index', $redirectParams)->with('error', 'Cannot delete the Super Admin account.');
         }
 
         // System Admin can only delete users from their company
         if (!$authUser->isSuperAdmin() && $user->company_id !== $authUser->company_id) {
-            return redirect()->route('users.index')->with('error', 'You can only delete users from your company.');
+            return redirect()->route('users.index', $redirectParams)->with('error', 'You can only delete users from your company.');
         }
 
         // Prevent deleting the last System Administrator
         if ($user->role === 'system_admin') {
             $systemAdminCount = User::where('role', 'system_admin')->count();
             if ($systemAdminCount <= 1) {
-                return redirect()->route('users.index')->with('error', 'Cannot delete the last System Administrator.');
+                return redirect()->route('users.index', $redirectParams)->with('error', 'Cannot delete the last System Administrator.');
             }
         }
 
         $user->delete();
-        return redirect()->route('users.index');
+
+        // Build redirect URL with company parameter if present
+        $redirectParams = [];
+        if (request()->has('company')) {
+            $redirectParams['company'] = request()->input('company');
+        }
+
+        return redirect()->route('users.index', $redirectParams)->with('success', 'User deleted successfully.');
     }
 
     /**

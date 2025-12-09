@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\NightDifferentialSetting;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+
 
 class NightDifferentialController extends Controller
 {
@@ -27,11 +29,19 @@ class NightDifferentialController extends Controller
             'is_active' => 'boolean'
         ]);
 
-        // Get current setting or create new one
-        $setting = NightDifferentialSetting::first();
+        // Get current setting for company or create new one
+        $user = Auth::user();
+        $query = NightDifferentialSetting::query();
+
+        if (!$user->isSuperAdmin()) {
+            $query->where('company_id', $user->company_id);
+        }
+
+        $setting = $query->first();
 
         if (!$setting) {
             $setting = new NightDifferentialSetting();
+            $setting->company_id = $user->company_id;
         }
 
         $setting->fill([

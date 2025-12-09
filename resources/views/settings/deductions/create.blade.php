@@ -12,7 +12,7 @@
         <form method="POST" action="{{ route('settings.deductions.store') }}">
             @csrf
 
-            <div class="grid grid-cols-1 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Deduction Name</label>
                     <input type="text" name="name" id="name" 
@@ -22,61 +22,61 @@
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
-            </div>
 
-            <div class="mt-6">
-                <label for="description" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                <textarea name="description" id="description" rows="3" 
-                          class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('description') }}</textarea>
-                @error('description')
-                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label for="type" class="block text-sm font-medium text-gray-700 mb-2">Deduction Type</label>
                     <select name="type" id="type" 
                             class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
                         <option value="">Select Type</option>
                         <option value="government" {{ old('type') == 'government' ? 'selected' : '' }}>Government</option>
-                        <option value="loan" {{ old('type') == 'loan' ? 'selected' : '' }}>Loan</option>
+                        {{-- <option value="loan" {{ old('type') == 'loan' ? 'selected' : '' }}>Loan</option> --}}
                         <option value="custom" {{ old('type') == 'custom' ? 'selected' : '' }}>Custom</option>
                     </select>
                     @error('type')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
+            </div>
 
+            <!-- Calculation Type and Rate Percentage/Fixed Amount -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label for="category" class="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                    <select name="category" id="category" 
+                    <label for="calculation_type" class="block text-sm font-medium text-gray-700 mb-2">Calculation Type</label>
+                    <select name="calculation_type" id="calculation_type" 
                             class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                        <option value="">Select Category</option>
-                        <option value="mandatory" {{ old('category') == 'mandatory' ? 'selected' : '' }}>Mandatory</option>
-                        <option value="voluntary" {{ old('category') == 'voluntary' ? 'selected' : '' }}>Voluntary</option>
+                        <option value="">Select Calculation Type</option>
+                        <option value="percentage" {{ old('calculation_type') == 'percentage' ? 'selected' : '' }}>Percentage</option>
+                        <option value="fixed_amount" {{ old('calculation_type') == 'fixed_amount' ? 'selected' : '' }}>Fixed Amount</option>
+                        <option value="sss_table" data-deduction="sss" style="display: none;" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'sss' ? 'selected' : '' }}>SSS Table</option>
+                        <option value="philhealth_table" data-deduction="philhealth" style="display: none;" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'philhealth' ? 'selected' : '' }}>PhilHealth Table</option>
+                        <option value="pagibig_table" data-deduction="pagibig" style="display: none;" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'pagibig' ? 'selected' : '' }}>Pag-IBIG Table</option>
+                        <option value="withholding_tax_table" data-deduction="withholding_tax" style="display: none;" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'withholding_tax' ? 'selected' : '' }}>Withholding Tax Table</option>
                     </select>
-                    @error('category')
+                    @error('calculation_type')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
-            </div>
 
-            <div class="mt-6">
-                <label for="calculation_type" class="block text-sm font-medium text-gray-700 mb-2">Calculation Type</label>
-                <select name="calculation_type" id="calculation_type" 
-                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                    <option value="">Select Calculation Type</option>
-                    <option value="percentage" {{ old('calculation_type') == 'percentage' ? 'selected' : '' }}>Percentage</option>
-                    <option value="fixed_amount" {{ old('calculation_type') == 'fixed_amount' ? 'selected' : '' }}>Fixed Amount</option>
-                    <option value="sss_table" data-deduction="sss" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'sss' ? 'selected' : '' }}>SSS Table</option>
-                    <option value="philhealth_table" data-deduction="philhealth" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'philhealth' ? 'selected' : '' }}>PhilHealth Table</option>
-                    <option value="pagibig_table" data-deduction="pagibig" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'pagibig' ? 'selected' : '' }}>Pag-IBIG Table</option>
-                    <option value="withholding_tax_table" data-deduction="withholding_tax" {{ old('calculation_type') == 'bracket' && old('tax_table_type') == 'withholding_tax' ? 'selected' : '' }}>Withholding Tax Table</option>
-                </select>
-                @error('calculation_type')
-                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                @enderror
+                <div id="percentage_field" style="display: none;">
+                    <label for="rate_percentage" class="block text-sm font-medium text-gray-700 mb-2">Rate Percentage (%)</label>
+                    <input type="number" name="rate_percentage" id="rate_percentage" min="0" max="100" step="0.01"
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                           placeholder="Enter percentage (e.g., 10 for 10%)"
+                           value="{{ old('rate_percentage') }}">
+                    @error('rate_percentage')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div id="fixed_amount_field" style="display: none;">
+                    <label for="fixed_amount" class="block text-sm font-medium text-gray-700 mb-2">Fixed Amount</label>
+                    <input type="number" name="fixed_amount" id="fixed_amount" step="0.01" min="0"
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
+                           value="{{ old('fixed_amount') }}">
+                    @error('fixed_amount')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
             </div>
 
             <!-- Frequency and Distribution Method -->
@@ -99,7 +99,7 @@
                 <div id="distribution_method_field">
                     <label for="distribution_method" class="block text-sm font-medium text-gray-700 mb-2">Distribution Method</label>
                     <select name="distribution_method" id="distribution_method" 
-                            class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                            class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
                         <option value="">Select Distribution Method</option>
                         <option value="last_payroll" {{ old('distribution_method') == 'last_payroll' ? 'selected' : '' }}>Last Payroll Only</option>
                         <option value="equally_distributed" {{ old('distribution_method') == 'equally_distributed' ? 'selected' : '' }}>Equally Distributed</option>
@@ -107,15 +107,72 @@
                     @error('distribution_method')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
-                    <p class="mt-1 text-xs text-gray-500">Choose how the amount is distributed across payrolls within the frequency period.</p>
+                    {{-- <p class="mt-1 text-xs text-gray-500">Choose how the amount is distributed across payrolls within the frequency period.</p> --}}
                 </div>
             </div>
 
             <!-- Hidden Tax Table Type field -->
             <input type="hidden" name="tax_table_type" id="hidden_tax_table_type" value="{{ old('tax_table_type') }}">
 
+            <!-- Pay Basis and Apply To -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div>
+                    <label for="pay_basis" class="block text-sm font-medium text-gray-700 mb-2">Pay Basis</label>
+                    <select name="pay_basis" id="pay_basis" 
+                            class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                        <option value="">Select Pay Basis</option>
+                        <option value="gross_pay" {{ old('pay_basis', 'gross_pay') === 'gross_pay' ? 'selected' : '' }}>
+                            Total Gross - basic + OT + holiday pay + allowances + bonus
+                        </option>
+                        <option value="taxable_income" {{ old('pay_basis') === 'taxable_income' ? 'selected' : '' }}>
+                            Taxable Income - includes only taxable allowances and bonuses
+                        </option>
+                        <option value="monthly_basic_salary" {{ old('pay_basis') === 'monthly_basic_salary' ? 'selected' : '' }}>
+                            Monthly Basic Salary - employee's monthly basic salary
+                        </option>
+                    </select>
+                    
+                    <div class="mt-2 text-xs text-gray-500">
+                        <p><strong>Total Gross:</strong> Includes all earnings</p>
+                        <p><strong>Taxable Income:</strong> Only taxable items</p>
+                        <p><strong>Monthly Basic Salary:</strong> For government contributions</p>
+                    </div>
+                    
+                    @error('pay_basis')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                    
+                    <!-- Hidden fields for backward compatibility -->
+                    <input type="hidden" name="apply_to_basic_pay" id="hidden_apply_to_basic_pay" value="0">
+                    <input type="hidden" name="apply_to_gross_pay" id="hidden_apply_to_gross_pay" value="1">
+                    <input type="hidden" name="apply_to_taxable_income" id="hidden_apply_to_taxable_income" value="0">
+                    <input type="hidden" name="apply_to_net_pay" id="hidden_apply_to_net_pay" value="0">
+                    <input type="hidden" name="apply_to_monthly_basic_salary" id="hidden_apply_to_monthly_basic_salary" value="0">
+                </div>
+
+                <div>
+                    <label for="benefit_eligibility" class="block text-sm font-medium text-gray-700 mb-2">Apply To</label>
+                    <select name="benefit_eligibility" id="benefit_eligibility" required
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <option value="both" {{ old('benefit_eligibility', 'both') == 'both' ? 'selected' : '' }}>
+                            Both (With Benefits & Without Benefits)
+                        </option>
+                        <option value="with_benefits" {{ old('benefit_eligibility') == 'with_benefits' ? 'selected' : '' }}>
+                            Only Employees With Benefits
+                        </option>
+                        <option value="without_benefits" {{ old('benefit_eligibility') == 'without_benefits' ? 'selected' : '' }}>
+                            Only Employees Without Benefits
+                        </option>
+                    </select>
+                    @error('benefit_eligibility')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                    <p class="mt-1 text-xs text-gray-500">Choose which employees this deduction/tax setting applies to based on their benefit status.</p>
+                </div>
+            </div>
+
             <!-- View Tax Table Button (shown for table types) -->
-            <div class="mt-4" id="view_table_section" style="display: none;">
+            <div class="mt-6" id="view_table_section" style="display: none;">
                 <button type="button" id="view_tax_table_btn" 
                         class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                     <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,115 +183,32 @@
                 </button>
             </div>
 
-            <!-- Share with Employer Section -->
-            <div class="mt-6" id="share_employer_section" style="display: none;">
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-                    <div class="flex items-center">
-                        <!-- Hidden field to ensure false value is sent when checkbox is unchecked -->
+            <!-- Share with Employer and Active checkboxes -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div>
+                    <div class="flex items-center h-full">
                         <input type="hidden" name="share_with_employer" value="0">
                         <input type="checkbox" name="share_with_employer" id="share_with_employer" value="1" 
                                {{ old('share_with_employer') ? 'checked' : '' }}
                                class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                        <label for="share_with_employer" class="ml-2 block text-sm font-medium text-blue-800">
+                        <label for="share_with_employer" class="ml-2 block text-sm text-gray-700">
                             Share with Employer
                         </label>
                     </div>
-                    <p class="mt-2 text-xs text-blue-700">
-                        When checked, only the employee share will be deducted from salary. 
-                        When unchecked, both employee and employer shares will be deducted from employee salary.
-                    </p>
-                    <div class="mt-2 text-xs text-blue-600">
-                        <strong>Note:</strong> This applies to SSS, PhilHealth, and Pag-IBIG. Withholding Tax is never shared with employer.
+                    <p class="mt-1 text-xs text-gray-500">Only employee share deducted (for SSS, PhilHealth, Pag-IBIG)</p>
+                </div>
+
+                <div>
+                    <div class="flex items-center h-full">
+                        <input type="checkbox" name="is_active" id="is_active" value="1" 
+                               {{ old('is_active', true) ? 'checked' : '' }}
+                               class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                        <label for="is_active" class="ml-2 block text-sm text-gray-700">Active</label>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div id="percentage_field" style="display: none;">
-                    <label for="rate_percentage" class="block text-sm font-medium text-gray-700 mb-2">Rate Percentage (%)</label>
-                    <input type="number" name="rate_percentage" id="rate_percentage" min="0" max="100"
-                           class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
-                           placeholder="Enter percentage (e.g., 10 for 10%)"
-                           value="{{ old('rate_percentage') }}">
-                    @error('rate_percentage')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div id="fixed_amount_field" style="display: none;">
-                    <label for="fixed_amount" class="block text-sm font-medium text-gray-700 mb-2">Fixed Amount</label>
-                    <input type="number" name="fixed_amount" id="fixed_amount" step="0.01" min="0"
-                           class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" 
-                           value="{{ old('fixed_amount') }}">
-                    @error('fixed_amount')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-            </div>
-
-            <!-- Pay Basis Section -->
-            <div class="mt-6">
-                <label for="pay_basis" class="block text-sm font-medium text-gray-700 mb-2">Pay Basis - Select where to deduct from:</label>
-                <select name="pay_basis" id="pay_basis" 
-                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
-                    <option value="">Select Pay Basis</option>
-                    <option value="gross_pay" {{ old('pay_basis', 'gross_pay') === 'gross_pay' ? 'selected' : '' }}>
-                        Total Gross - basic + OT + holiday pay + allowances + bonus
-                    </option>
-                    <option value="taxable_income" {{ old('pay_basis') === 'taxable_income' ? 'selected' : '' }}>
-                        Taxable Income - includes only taxable allowances and bonuses
-                    </option>
-                    <option value="monthly_basic_salary" {{ old('pay_basis') === 'monthly_basic_salary' ? 'selected' : '' }}>
-                        Monthly Basic Salary - employee's monthly basic salary
-                    </option>
-                </select>
-                
-                <div class="mt-2 text-sm text-gray-500">
-                    <p><strong>Total Gross:</strong> Includes all earnings - basic pay, overtime, holiday pay, allowances, and bonuses</p>
-                    <p><strong>Taxable Income:</strong> Includes basic pay, overtime, holiday pay, and only taxable allowances/bonuses</p>
-                    <p><strong>Monthly Basic Salary:</strong> Uses the employee's monthly basic salary from their profile (ideal for government contributions like PhilHealth)</p>
-                </div>
-                
-                @error('pay_basis')
-                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                @enderror
-                
-                <!-- Hidden fields for backward compatibility -->
-                <input type="hidden" name="apply_to_basic_pay" id="hidden_apply_to_basic_pay" value="0">
-                <input type="hidden" name="apply_to_gross_pay" id="hidden_apply_to_gross_pay" value="1">
-                <input type="hidden" name="apply_to_taxable_income" id="hidden_apply_to_taxable_income" value="0">
-                <input type="hidden" name="apply_to_net_pay" id="hidden_apply_to_net_pay" value="0">
-                <input type="hidden" name="apply_to_monthly_basic_salary" id="hidden_apply_to_monthly_basic_salary" value="0">
-            </div>
-
-            <div class="mt-6 flex items-center">
-                <input type="checkbox" name="is_active" id="is_active" value="1" 
-                       {{ old('is_active', true) ? 'checked' : '' }}
-                       class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                <label for="is_active" class="ml-2 block text-sm text-gray-700">Active</label>
-            </div>
-
-            <div class="mt-6">
-                <label for="benefit_eligibility" class="block text-sm font-medium text-gray-700 mb-2">Apply To</label>
-                <select name="benefit_eligibility" id="benefit_eligibility" required
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                    <option value="both" {{ old('benefit_eligibility', 'both') == 'both' ? 'selected' : '' }}>
-                        Both (With Benefits & Without Benefits)
-                    </option>
-                    <option value="with_benefits" {{ old('benefit_eligibility') == 'with_benefits' ? 'selected' : '' }}>
-                        Only Employees With Benefits
-                    </option>
-                    <option value="without_benefits" {{ old('benefit_eligibility') == 'without_benefits' ? 'selected' : '' }}>
-                        Only Employees Without Benefits
-                    </option>
-                </select>
-                @error('benefit_eligibility')
-                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                @enderror
-                <p class="mt-1 text-xs text-gray-500">Choose which employees this deduction/tax setting applies to based on their benefit status.</p>
-            </div>
-
-            <div class="mt-8 pt-6 border-t border-gray-200 flex justify-end space-x-3">
+            <div class="mt-8 flex justify-end space-x-3">
                 <a href="{{ route('settings.deductions.index') }}" 
                    class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md">
                     Cancel
@@ -279,14 +253,12 @@ document.getElementById('calculation_type').addEventListener('change', function(
     const percentageField = document.getElementById('percentage_field');
     const fixedAmountField = document.getElementById('fixed_amount_field');
     const viewTableSection = document.getElementById('view_table_section');
-    const shareEmployerSection = document.getElementById('share_employer_section');
     const hiddenTaxTableType = document.getElementById('hidden_tax_table_type');
     
     // Hide all fields first
     percentageField.style.display = 'none';
     fixedAmountField.style.display = 'none';
     viewTableSection.style.display = 'none';
-    shareEmployerSection.style.display = 'none';
     
     // Show relevant field and set tax table type
     if (value === 'percentage') {
@@ -297,23 +269,18 @@ document.getElementById('calculation_type').addEventListener('change', function(
         hiddenTaxTableType.value = '';
     } else if (value === 'sss_table') {
         viewTableSection.style.display = 'block';
-        shareEmployerSection.style.display = 'block';
         hiddenTaxTableType.value = 'sss';
-        // Update the actual calculation_type for form submission
         this.setAttribute('data-actual-type', 'bracket');
     } else if (value === 'philhealth_table') {
         viewTableSection.style.display = 'block';
-        shareEmployerSection.style.display = 'block';
         hiddenTaxTableType.value = 'philhealth';
         this.setAttribute('data-actual-type', 'bracket');
     } else if (value === 'pagibig_table') {
         viewTableSection.style.display = 'block';
-        shareEmployerSection.style.display = 'block';
         hiddenTaxTableType.value = 'pagibig';
         this.setAttribute('data-actual-type', 'bracket');
     } else if (value === 'withholding_tax_table') {
         viewTableSection.style.display = 'block';
-        // Note: No share_employer_section for withholding tax
         hiddenTaxTableType.value = 'withholding_tax';
         this.setAttribute('data-actual-type', 'bracket');
     }

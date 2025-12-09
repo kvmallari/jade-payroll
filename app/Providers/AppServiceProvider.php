@@ -37,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
             if (Auth::check()) {
                 $user = Auth::user();
                 $selectedCompanyId = session('selected_company_id');
-                
+
                 // For Super Admin, use selected company or default to user's company
                 if ($user->isSuperAdmin()) {
                     $workingCompanyId = $selectedCompanyId ?? $user->company_id;
@@ -47,9 +47,9 @@ class AppServiceProvider extends ServiceProvider
                     $workingCompanyId = $user->company_id;
                     $allCompanies = collect();
                 }
-                
+
                 $selectedCompany = $workingCompanyId ? \App\Models\Company::find($workingCompanyId) : null;
-                
+
                 $view->with([
                     'isSuperAdmin' => $user->isSuperAdmin(),
                     'selectedCompanyId' => $workingCompanyId,

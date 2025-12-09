@@ -57,13 +57,15 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employees</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">License</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @foreach($companies as $company)
-                                <tr class="hover:bg-gray-50" 
-                                    oncontextmenu="showCompanyContextMenu(event, {{ $company->id }}, {{ json_encode($company->name) }}, '{{ $company->is_active ? 'true' : 'false' }}', '{{ (!$company->is_active && $company->users_count == 0 && $company->employees_count == 0) ? 'true' : 'false' }}'); return false;">
+                                <tr class="hover:bg-gray-50 cursor-pointer" 
+                                    onclick="window.location.href='{{ route('users.index') }}?company={{ urlencode(strtolower($company->name)) }}';"
+                                    oncontextmenu="showCompanyContextMenu(event, {{ $company->id }}, {{ json_encode($company->name) }}, '{{ $company->is_active ? 'true' : 'false' }}', '{{ (!$company->is_active && $company->users_count == 0 && $company->employees_count == 0) ? 'true' : 'false' }}', '{{ $company->license_key ?? '' }}'); return false;">
                                     <td class="px-6 py-4">
                                         <div class="text-sm font-medium text-gray-900">{{ $company->name }}</div>
                                         @if($company->code)
@@ -75,6 +77,17 @@
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900">
                                         {{ $company->employees_count }}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        @if($company->license_key)
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                Activated
+                                            </span>
+                                        @else
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                Not Activated
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -167,6 +180,49 @@
                     <button type="submit" id="updateCompanyBtn"
                             class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
                         Update Company
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- License Key Modal -->
+    <div id="licenseKeyModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Manage License Key</h3>
+                <button type="button" onclick="closeLicenseKeyModal()" class="text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <p class="text-sm text-gray-600">Company: <span id="license_company_name" class="font-medium text-gray-900"></span></p>
+            </div>
+
+            <form id="licenseKeyForm" method="POST" action="">
+                @csrf
+                <div class="mb-4">
+                    <label for="license_key" class="block text-sm font-medium text-gray-700 mb-2">License Key</label>
+                    <textarea name="license_key" id="license_key" rows="3"
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                           placeholder="Enter license key or leave empty to remove"></textarea>
+                    <p class="mt-1 text-xs text-gray-500">Leave empty to deactivate the license. License key must be from the system license list.</p>
+                    @if($errors->has('license_key'))
+                        <p class="mt-1 text-sm text-red-600">{{ $errors->first('license_key') }}</p>
+                    @endif
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeLicenseKeyModal()"
+                            class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                        Cancel
+                    </button>
+                    <button type="submit" id="updateLicenseBtn"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Update License
                     </button>
                 </div>
             </form>
@@ -278,14 +334,25 @@
             const editForm = document.getElementById('editCompanyForm');
             const updateBtn = document.getElementById('updateCompanyBtn');
             
+            // Add license key form handler
+            const licenseForm = document.getElementById('licenseKeyForm');
+            const licenseBtn = document.getElementById('updateLicenseBtn');
+            
+            if (licenseForm) {
+                licenseForm.addEventListener('submit', function(e) {
+                    licenseBtn.disabled = true;
+                    licenseBtn.textContent = 'Updating...';
+                });
+            }
+            
             editForm.addEventListener('submit', function(e) {
                 updateBtn.disabled = true;
             });
         });
 
-        function showCompanyContextMenu(event, companyId, name, isActive, canDelete) {
+        function showCompanyContextMenu(event, companyId, name, isActive, canDelete, licenseKey) {
             console.log('=== RIGHT CLICK DETECTED ===');
-            console.log('Company:', companyId, 'Name:', name, 'Active:', isActive, 'Can Delete:', canDelete);
+            console.log('Company:', companyId, 'Name:', name, 'Active:', isActive, 'Can Delete:', canDelete, 'License Key:', licenseKey);
             
             event.preventDefault();
             event.stopPropagation();
@@ -296,11 +363,11 @@
             allMenus.forEach(menu => menu.remove());
             
             // Create the context menu
-            createCompanyContextMenu(event, companyId, name, isActive, canDelete);
+            createCompanyContextMenu(event, companyId, name, isActive, canDelete, licenseKey);
         }
 
-        function createCompanyContextMenu(event, companyId, name, isActive, canDelete) {
-            console.log('Creating context menu for company:', companyId, 'name:', name);
+        function createCompanyContextMenu(event, companyId, name, isActive, canDelete, licenseKey) {
+            console.log('Creating context menu for company:', companyId, 'name:', name, 'licenseKey:', licenseKey);
             
             // Create the context menu element
             const contextMenu = document.createElement('div');
@@ -336,6 +403,23 @@
                 handleEdit(companyId);
             });
             actionsContainer.appendChild(editButton);
+            
+            // Create Manage License button
+            const licenseButton = document.createElement('a');
+            licenseButton.href = '#';
+            licenseButton.className = 'flex items-center px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 transition-colors duration-150';
+            licenseButton.innerHTML = `
+                <svg class="w-4 h-4 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                </svg>
+                Manage License
+            `;
+            licenseButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                closeContextMenu();
+                openLicenseKeyModal(companyId, name, licenseKey || '');
+            });
+            actionsContainer.appendChild(licenseButton);
             
             // Create divider
             const divider = document.createElement('div');
@@ -407,11 +491,26 @@
             document.getElementById('edit_name-error').classList.add('hidden');
         }
 
+        function openLicenseKeyModal(companyId, companyName, currentLicenseKey) {
+            document.getElementById('license_company_name').textContent = companyName;
+            document.getElementById('license_key').value = currentLicenseKey || '';
+            document.getElementById('licenseKeyForm').action = `/companies/${companyId}/license-key`;
+            document.getElementById('licenseKeyModal').classList.remove('hidden');
+            document.getElementById('license_key').focus();
+        }
+
+        function closeLicenseKeyModal() {
+            document.getElementById('licenseKeyModal').classList.add('hidden');
+            document.getElementById('licenseKeyForm').reset();
+            document.getElementById('license_key-error').classList.add('hidden');
+        }
+
         // Close modal on Escape key
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeCreateModal();
                 closeEditModal();
+                closeLicenseKeyModal();
             }
         });
 
@@ -425,6 +524,12 @@
         document.getElementById('editCompanyModal')?.addEventListener('click', function(event) {
             if (event.target === this) {
                 closeEditModal();
+            }
+        });
+
+        document.getElementById('licenseKeyModal')?.addEventListener('click', function(event) {
+            if (event.target === this) {
+                closeLicenseKeyModal();
             }
         });
 

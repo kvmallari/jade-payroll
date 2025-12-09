@@ -15,7 +15,9 @@ class ValidateLicense
      */
     protected $excludedRoutes = [
         'license.activate',
-        'license.activate.store'
+        'license.activate.store',
+        'logout',
+        'login.store'  // Allow login POST to process even with expired CSRF
     ];
 
     /**
@@ -27,6 +29,12 @@ class ValidateLicense
     {
         // Skip license validation for excluded routes
         if ($this->shouldSkipValidation($request)) {
+            return $next($request);
+        }
+
+        // Skip license validation for authenticated users without a company (super admin)
+        $user = auth()->user();
+        if ($user && !$user->company_id) {
             return $next($request);
         }
 
@@ -56,9 +64,16 @@ class ValidateLicense
             return true;
         }
 
-        // Skip if URL starts with license paths
+        // Skip if current route is the login route
+        if ($currentRouteName === 'login') {
+            return true;
+        }
+
+        // Skip if URL starts with license paths or auth paths
         $path = $request->path();
         if (
+            $path === '/' ||  // Skip root path (login page)
+            $path === 'logout' ||  // Skip logout path
             str_starts_with($path, 'license/') ||
             str_starts_with($path, 'login') ||
             str_starts_with($path, 'register') ||

@@ -14,7 +14,7 @@ class CompanySelectorController extends Controller
     public function setCompany(Request $request)
     {
         $user = Auth::user();
-        
+
         // Only Super Admin can select companies
         if (!$user->isSuperAdmin()) {
             return response()->json([
@@ -22,23 +22,23 @@ class CompanySelectorController extends Controller
                 'message' => 'Unauthorized'
             ], 403);
         }
-        
+
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id'
         ]);
-        
+
         $company = Company::find($validated['company_id']);
-        
+
         if (!$company) {
             return response()->json([
                 'success' => false,
                 'message' => 'Company not found'
             ], 404);
         }
-        
+
         // Store in session
         session(['selected_company_id' => $company->id]);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Company selected successfully',
@@ -49,23 +49,23 @@ class CompanySelectorController extends Controller
             ]
         ]);
     }
-    
+
     /**
      * Clear the selected company (revert to user's own company)
      */
     public function clearCompany()
     {
         $user = Auth::user();
-        
+
         if (!$user->isSuperAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized'
             ], 403);
         }
-        
+
         session()->forget('selected_company_id');
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Company selection cleared'

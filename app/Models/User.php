@@ -142,7 +142,7 @@ class User extends Authenticatable
             // For Super Admin, use selected company from session, or fall back to their company
             return session('selected_company_id') ?? $this->company_id;
         }
-        
+
         // For all other users, use their assigned company
         return $this->company_id;
     }

@@ -74,9 +74,9 @@ class CompanyController extends Controller
             $validated['code'] = $code;
         }
 
-        // Set default active status to false (inactive) until users are assigned
+        // Set default active status to true (active)
         if (!isset($validated['is_active'])) {
-            $validated['is_active'] = false;
+            $validated['is_active'] = true;
         }
 
         $company = Company::create($validated);
@@ -126,12 +126,37 @@ class CompanyController extends Controller
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'is_active' => 'boolean',
+            'license_key' => 'nullable|string|max:255',
         ]);
 
         $company->update($validated);
 
         return redirect()->route('companies.index')
             ->with('success', 'Company updated successfully.');
+    }
+
+    /**
+     * Update license key for a company (Super Admin only)
+     */
+    public function updateLicenseKey(Request $request, Company $company)
+    {
+        $validated = $request->validate([
+            'license_key' => 'nullable|string|max:255',
+        ]);
+
+        // If license key is provided, validate it exists in system licenses
+        if (!empty($validated['license_key'])) {
+            if (!\App\Services\LicenseService::isValidLicenseKey($validated['license_key'])) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['license_key' => 'Invalid license key. The license key must be listed in the system. Run "php artisan license:list" to see available licenses.']);
+            }
+        }
+
+        $company->update(['license_key' => $validated['license_key']]);
+
+        return redirect()->route('companies.index')
+            ->with('success', 'License key updated successfully.');
     }
 
     /**

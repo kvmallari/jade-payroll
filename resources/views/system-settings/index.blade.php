@@ -49,7 +49,7 @@
                                     <dt class="text-gray-600">Environment:</dt>
                                     <dd class="text-gray-900 font-medium">
                                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                                            {{ app()->environment() }}
+                                            {{ $settings['system']['environment'] ?? app()->environment() }}
                                         </span>
                                     </dd>
                                 </div>
@@ -112,6 +112,69 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Email Domain Configuration -->
+            @if(Auth::user()->isSuperAdmin())
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">
+                        <svg class="inline w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        Email Domain Configuration
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-600">Configure the default email domain for user accounts.</p>
+                </div>
+
+                <div class="p-6">
+                    <form method="POST" action="{{ route('system-settings.update-domain') }}">
+                        @csrf
+                        <div class="max-w-xl">
+                            <label for="email_domain" class="block text-sm font-medium text-gray-700 mb-2">
+                                Email Domain
+                            </label>
+                            <div class="flex gap-3">
+                                <div class="flex-1">
+                                    <input type="text" name="email_domain" id="email_domain" 
+                                           value="{{ $settings['system']['email_domain'] ?? 'jadepayroll.com' }}"
+                                           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                           placeholder="jadepayroll.com">
+                                    {{-- <p class="mt-2 text-sm text-gray-500">
+                                        This domain will be automatically appended to user email addresses (e.g., username@{{ $settings['system']['email_domain'] ?? 'jadepayroll.com' }})
+                                    </p> --}}
+                                </div>
+                                <div>
+                                    <button type="submit" 
+                                            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                        Update Domain
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    {{-- <div class="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3 flex-1">
+                                <h3 class="text-sm font-medium text-blue-800">Environment-Based Domain Detection</h3>
+                                <div class="mt-2 text-sm text-blue-700">
+                                    <ul class="list-disc pl-5 space-y-1">
+                                        <li><strong>Local Environment:</strong> Uses the configured domain above</li>
+                                        <li><strong>Production Environment:</strong> Automatically uses the actual domain from the URL</li>
+                                        <li>Current detected environment: <span class="font-semibold">{{ $settings['system']['environment'] }}</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div> --}}
+                </div>
+            </div>
+            @endif
 
             <!-- License Information -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">

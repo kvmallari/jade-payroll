@@ -32,11 +32,17 @@ class ListLicenseKeys extends Command
         $this->info('License Keys:');
         $this->line('');
 
-        $headers = ['ID', 'Customer', 'Max Employees', 'Price', 'Status', 'Activated At', 'Expires At'];
+        $headers = ['ID', 'Customer', 'Max Employees', 'Price', 'Status', 'License Key', 'Activated At', 'Expires At'];
         $rows = [];
 
         foreach ($licenses as $license) {
             $planInfo = $license->plan_info ?? [];
+
+            // Truncate license key for display
+            $licenseKeyDisplay = $license->license_key;
+            if (strlen($licenseKeyDisplay) > 40) {
+                $licenseKeyDisplay = substr($licenseKeyDisplay, 0, 20) . '...' . substr($licenseKeyDisplay, -17);
+            }
 
             $rows[] = [
                 $license->id,
@@ -44,10 +50,14 @@ class ListLicenseKeys extends Command
                 $planInfo['max_employees'] ?? 'N/A',
                 isset($planInfo['price']) ? '₱' . number_format($planInfo['price'], 2) : 'N/A',
                 $this->getStatusLabel($license),
+                $licenseKeyDisplay,
                 $license->activated_at ? $license->activated_at->format('Y-m-d H:i') : 'Not Activated',
                 $license->expires_at ? $license->expires_at->format('Y-m-d H:i') : 'N/A'
             ];
         }
+
+        $this->line('');
+        $this->line('Tip: Copy the full license key from the database or generation output.');
 
         $this->table($headers, $rows);
 

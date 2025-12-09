@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EmploymentType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class EmploymentTypeController extends Controller
 {
@@ -12,7 +13,17 @@ class EmploymentTypeController extends Controller
      */
     public function index()
     {
-        $employmentTypes = EmploymentType::all();
+        $user = Auth::user();
+
+        $query = EmploymentType::query();
+
+        // Scope by company
+        if (!$user->isSuperAdmin()) {
+            $query->where('company_id', $user->company_id);
+        }
+
+        $employmentTypes = $query->orderBy('name')->get();
+
         return view('settings.employment-types.index', compact('employmentTypes'));
     }
 
@@ -29,14 +40,17 @@ class EmploymentTypeController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
+
         $request->validate([
-            'name' => 'required|string|max:255|unique:employment_types,name',
+            'name' => 'required|string|max:255',
             'has_benefits' => 'boolean',
             'description' => 'nullable|string',
             'is_active' => 'boolean'
         ]);
 
         $employmentType = EmploymentType::create([
+            'company_id' => $user->company_id,
             'name' => $request->name,
             'has_benefits' => $request->input('has_benefits') == '1' || $request->input('has_benefits') === 1,
             'description' => $request->description,
@@ -77,7 +91,7 @@ class EmploymentTypeController extends Controller
     public function update(Request $request, EmploymentType $employmentType)
     {
         $request->validate([
-            'name' => 'required|string|max:255|unique:employment_types,name,' . $employmentType->id,
+            'name' => 'required|string|max:255',
             'has_benefits' => 'boolean',
             'description' => 'nullable|string',
             'is_active' => 'boolean'
