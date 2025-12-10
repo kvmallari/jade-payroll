@@ -27,17 +27,10 @@
                         <div>
                             <label for="email" class="block text-sm font-medium text-gray-700">Email Address <span class="text-red-500">*</span></label>
                             @php
-                                // Get email domain from settings or use default
-                                $emailDomain = \App\Models\Setting::get('email_domain', 'jadepayroll.com');
-                                
-                                // Detect environment based on current URL
-                                $currentDomain = request()->getHost();
-                                $isLocal = $currentDomain === 'localhost' || str_contains($currentDomain, '127.0.0.1');
-                                
-                                // Use configured domain for local, actual domain for production
-                                $activeDomain = $isLocal ? $emailDomain : $currentDomain;
+                                // Get email domain from system settings
+                                $emailDomain = \App\Models\Setting::get('email_domain', 'gmail.com');
                             @endphp
-                            <input type="text" name="email" id="email" value="&#64;{{ $activeDomain }}" required
+                            <input type="text" name="email" id="email" value="&#64;{{ $emailDomain }}" required
                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('email') border-red-500 @enderror">
                             @error('email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -162,7 +155,7 @@
 </div>
 
 <script>
-const emailDomain = '@' + '{{ $activeDomain }}';
+const emailDomain = '@' + '{{ $emailDomain }}';
 const emailInput = document.getElementById('email');
 
 // Initialize the email field with domain

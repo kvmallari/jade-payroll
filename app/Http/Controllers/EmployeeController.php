@@ -86,7 +86,9 @@ class EmployeeController extends Controller
         // Paginate with configurable records per page (default 10)
         $perPage = $request->get('per_page', 10);
         $employees = $query->paginate($perPage)->withQueryString();
-        $departments = Department::active()->get();
+
+        // Get departments for filter - scoped by company
+        $departments = Department::where('company_id', $user->company_id)->active()->get();
 
         // Get companies for filter (only for System Administrator)
         $companies = [];
@@ -254,17 +256,18 @@ class EmployeeController extends Controller
     {
         $this->authorize('create employees');
 
-        $departments = Department::active()->get();
-        $positions = Position::active()->get();
-        $timeSchedules = TimeSchedule::active()->get();
-        $daySchedules = DaySchedule::active()->get();
-        $employmentTypes = \App\Models\EmploymentType::active()->get();
-        $roles = Role::whereIn('name', ['HR Head', 'HR Staff', 'Employee'])->get();
-        $paySchedules = \App\Models\PayScheduleSetting::all();
-
         // Get employee default settings scoped by company
         $user = Auth::user();
         $workingCompanyId = $user->getWorkingCompanyId();
+
+        // Filter all options by company_id
+        $departments = Department::where('company_id', $workingCompanyId)->active()->get();
+        $positions = Position::where('company_id', $workingCompanyId)->active()->get();
+        $timeSchedules = TimeSchedule::where('company_id', $workingCompanyId)->active()->get();
+        $daySchedules = DaySchedule::where('company_id', $workingCompanyId)->active()->get();
+        $employmentTypes = \App\Models\EmploymentType::where('company_id', $workingCompanyId)->active()->get();
+        $roles = Role::whereIn('name', ['HR Head', 'HR Staff', 'Employee'])->get();
+        $paySchedules = \App\Models\PayScheduleSetting::where('company_id', $workingCompanyId)->get();
 
         $employeeSettings = $this->getEmployeeSettingsForCompany($workingCompanyId);
 
@@ -433,11 +436,17 @@ class EmployeeController extends Controller
         $this->authorize('edit employees');
 
         $employee->load(['user.roles', 'timeSchedule', 'daySchedule', 'employmentType']);
-        $departments = Department::active()->get();
-        $positions = Position::active()->get();
-        $timeSchedules = TimeSchedule::active()->get();
-        $daySchedules = DaySchedule::active()->get();
-        $employmentTypes = \App\Models\EmploymentType::active()->get();
+
+        // Get current user's company for filtering
+        $user = Auth::user();
+        $workingCompanyId = $user->getWorkingCompanyId();
+
+        // Filter all options by company_id
+        $departments = Department::where('company_id', $workingCompanyId)->active()->get();
+        $positions = Position::where('company_id', $workingCompanyId)->active()->get();
+        $timeSchedules = TimeSchedule::where('company_id', $workingCompanyId)->active()->get();
+        $daySchedules = DaySchedule::where('company_id', $workingCompanyId)->active()->get();
+        $employmentTypes = \App\Models\EmploymentType::where('company_id', $workingCompanyId)->active()->get();
         $roles = Role::whereIn('name', ['HR Head', 'HR Staff', 'Employee'])->get();
 
         return view('employees.edit', compact('employee', 'departments', 'positions', 'timeSchedules', 'daySchedules', 'employmentTypes', 'roles'));

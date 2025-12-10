@@ -135,7 +135,11 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label for="email" class="block text-sm font-medium text-gray-700">Email Address <span class="text-red-500">*</span></label>
-                                <input type="email" name="email" id="email" value="{{ old('email') }}" required
+                                @php
+                                    // Get email domain from system settings
+                                    $emailDomain = \App\Models\Setting::get('email_domain', 'gmail.com');
+                                @endphp
+                                <input type="email" name="email" id="email" value="{{ old('email', '@' . $emailDomain) }}" required
                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm lowercase-input">
                                 @error('email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -1022,10 +1026,103 @@
                 }
             });
 
-            // Email field
+            // Email field with domain protection
             const emailInput = document.getElementById('email');
             if (emailInput) {
                 emailLowercase(emailInput);
+                
+                const emailDomain = '@' + '{{ \App\Models\Setting::get("email_domain", "gmail.com") }}';
+                
+                // Initialize the email field with domain if empty
+                if (!emailInput.value || emailInput.value === emailDomain) {
+                    emailInput.value = emailDomain;
+                }
+                
+                // Handle input to prevent domain deletion
+                emailInput.addEventListener('input', function(e) {
+                    const value = this.value;
+                    
+                    // Always ensure the domain is present
+                    if (!value.includes(emailDomain)) {
+                        this.value = emailDomain;
+                        // Move cursor to the beginning (before @)
+                        this.setSelectionRange(0, 0);
+                    } else if (!value.endsWith(emailDomain)) {
+                        // If domain is not at the end, fix it
+                        const atIndex = value.indexOf('@');
+                        if (atIndex > -1) {
+                            const username = value.substring(0, atIndex);
+                            this.value = username + emailDomain;
+                        } else {
+                            this.value = emailDomain;
+                        }
+                    }
+                });
+                
+                // Handle keydown to prevent deleting the @ and domain
+                emailInput.addEventListener('keydown', function(e) {
+                    const value = this.value;
+                    const cursorPos = this.selectionStart;
+                    const atIndex = value.indexOf('@');
+                    
+                    // Prevent deletion of @ and anything after it
+                    if (atIndex > -1) {
+                        // Backspace
+                        if (e.key === 'Backspace' && cursorPos <= atIndex + 1) {
+                            if (cursorPos === atIndex + 1) {
+                                e.preventDefault();
+                                this.setSelectionRange(atIndex, atIndex);
+                            }
+                        }
+                        // Delete
+                        if (e.key === 'Delete' && cursorPos >= atIndex) {
+                            e.preventDefault();
+                        }
+                        // Arrow right - don't allow cursor past @
+                        if (e.key === 'ArrowRight' && cursorPos >= atIndex) {
+                            e.preventDefault();
+                        }
+                        // Prevent selection of domain part
+                        if (cursorPos > atIndex && this.selectionEnd > atIndex) {
+                            if (e.key !== 'ArrowLeft' && e.key !== 'Home') {
+                                this.setSelectionRange(atIndex, atIndex);
+                            }
+                        }
+                    }
+                });
+                
+                // Handle click to prevent cursor placement after @
+                emailInput.addEventListener('click', function(e) {
+                    const atIndex = this.value.indexOf('@');
+                    if (atIndex > -1 && this.selectionStart > atIndex) {
+                        this.setSelectionRange(atIndex, atIndex);
+                    }
+                });
+                
+                // Handle selection to prevent selecting domain part
+                emailInput.addEventListener('select', function(e) {
+                    const atIndex = this.value.indexOf('@');
+                    if (atIndex > -1 && this.selectionEnd > atIndex) {
+                        this.setSelectionRange(Math.min(this.selectionStart, atIndex), atIndex);
+                    }
+                });
+                
+                // Handle paste to preserve domain
+                emailInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    const atIndex = this.value.indexOf('@');
+                    const cursorPos = this.selectionStart;
+                    
+                    if (atIndex > -1 && cursorPos <= atIndex) {
+                        const before = this.value.substring(0, cursorPos);
+                        const after = this.value.substring(this.selectionEnd, atIndex);
+                        const username = before + pastedText + after;
+                        this.value = username + emailDomain;
+                        const newCursorPos = (before + pastedText).length;
+                        this.setSelectionRange(newCursorPos, newCursorPos);
+                    }
+                });
             }
 
             // Setup department-position filtering

@@ -176,7 +176,8 @@
             </div>
             @endif
 
-            <!-- License Information -->
+            <!-- License Information - Only for System Administrator -->
+            @if(Auth::user()->hasRole('System Administrator'))
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 border-b border-gray-200">
                     <h3 class="text-lg font-medium text-gray-900">
@@ -208,14 +209,18 @@
                                     <dt class="text-gray-600">License Cost:</dt>
                                     <dd class="text-gray-900 font-medium">₱{{ number_format($currentLicense->price ?? 0, 2) }}</dd>
                                 </div>
+                                @if($currentLicense->activated_at)
                                 <div class="flex justify-between text-sm">
                                     <dt class="text-gray-600">Activated:</dt>
                                     <dd class="text-gray-900 font-medium">{{ $currentLicense->activated_at->format('M d, Y - g:i A') }}</dd>
                                 </div>
+                                @endif
+                                @if($currentLicense->expires_at)
                                 <div class="flex justify-between text-sm">
                                     <dt class="text-gray-600">Expires:</dt>
                                     <dd class="text-gray-900 font-medium">{{ $currentLicense->expires_at->format('M d, Y - g:i A') }}</dd>
                                 </div>
+                                @endif
                             </div>
                         </div>
 
@@ -311,6 +316,7 @@
                     @endif
                 </div>
             </div>
+            @endif
 
         </div>
     </div>

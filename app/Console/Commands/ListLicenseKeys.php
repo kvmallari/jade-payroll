@@ -32,7 +32,7 @@ class ListLicenseKeys extends Command
         $this->info('License Keys:');
         $this->line('');
 
-        $headers = ['ID', 'Customer', 'Max Employees', 'Price', 'Status', 'License Key', 'Activated At', 'Expires At'];
+        $headers = ['ID', 'Customer', 'Max Employees', 'Price', 'Status', 'License Key', 'Used By', 'Activated At', 'Expires At'];
         $rows = [];
 
         foreach ($licenses as $license) {
@@ -44,13 +44,17 @@ class ListLicenseKeys extends Command
                 $licenseKeyDisplay = substr($licenseKeyDisplay, 0, 20) . '...' . substr($licenseKeyDisplay, -17);
             }
 
+            // Check if license is being used by any company
+            $usedBy = \App\Models\Company::where('license_key', $license->license_key)->value('name');
+
             $rows[] = [
                 $license->id,
                 $planInfo['customer'] ?? 'N/A',
                 $planInfo['max_employees'] ?? 'N/A',
                 isset($planInfo['price']) ? '₱' . number_format($planInfo['price'], 2) : 'N/A',
-                $this->getStatusLabel($license),
+                $this->getStatusLabel($license, $usedBy),
                 $licenseKeyDisplay,
+                $usedBy ?? '<fg=gray>Not Used</>',
                 $license->activated_at ? $license->activated_at->format('Y-m-d H:i') : 'Not Activated',
                 $license->expires_at ? $license->expires_at->format('Y-m-d H:i') : 'N/A'
             ];
@@ -64,16 +68,19 @@ class ListLicenseKeys extends Command
         return 0;
     }
 
-    private function getStatusLabel($license)
+    private function getStatusLabel($license, $usedBy = null)
     {
-        if (!$license->is_active) {
-            return '<fg=red>Inactive</>';
-        }
-
-        if ($license->isExpired()) {
+        // Check if license is expired
+        if ($license->expires_at && $license->expires_at->isPast()) {
             return '<fg=red>Expired</>';
         }
 
-        return '<fg=green>Active</>';
+        // If license is being used by a company, show as In-Use
+        if ($usedBy) {
+            return '<fg=green>In-Use</>';
+        }
+
+        // Not being used by any company
+        return '<fg=gray>Not Used</>';
     }
 }

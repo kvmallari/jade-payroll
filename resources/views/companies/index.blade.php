@@ -80,9 +80,15 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         @if($company->license_key)
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                Activated
-                                            </span>
+                                            @if(isset($company->license_expired) && $company->license_expired)
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                    Expired
+                                                </span>
+                                            @else
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                    Activated
+                                                </span>
+                                            @endif
                                         @else
                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                                                 Not Activated
@@ -135,6 +141,15 @@
                     <span class="text-red-500 text-sm hidden" id="name-error"></span>
                 </div>
 
+                <div class="mb-4">
+                    <label for="code" class="block text-sm font-medium text-gray-700 mb-2">Company Code <span class="text-red-500">*</span></label>
+                    <input type="text" name="code" id="code" required
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                           placeholder="Enter company code">
+                    {{-- <p class="mt-1 text-xs text-gray-500">Unique identifier for the company</p> --}}
+                    <span class="text-red-500 text-sm hidden" id="code-error"></span>
+                </div>
+
                 <div class="flex justify-end space-x-3">
                     <button type="button" onclick="closeCreateModal()"
                             class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
@@ -172,6 +187,15 @@
                     <span class="text-red-500 text-sm hidden" id="edit_name-error"></span>
                 </div>
 
+                <div class="mb-4">
+                    <label for="edit_code" class="block text-sm font-medium text-gray-700 mb-2">Company Code <span class="text-red-500">*</span></label>
+                    <input type="text" name="code" id="edit_code" required
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                           placeholder="Enter company code">
+                    {{-- <p class="mt-1 text-xs text-gray-500">Unique identifier for the company</p> --}}
+                    <span class="text-red-500 text-sm hidden" id="edit_code-error"></span>
+                </div>
+
                 <div class="flex justify-end space-x-3">
                     <button type="button" onclick="closeEditModal()"
                             class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
@@ -199,10 +223,19 @@
             </div>
 
             <div class="mb-4">
-                <p class="text-sm text-gray-600">Company: <span id="license_company_name" class="font-medium text-gray-900"></span></p>
+                <div id="license_info" class="hidden bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Current License Information:</p>
+                    <div class="space-y-1 text-sm text-gray-600">
+                        <p>Company: <span id="license_company_name_display" class="font-medium text-gray-900"></span></p>
+                        <p>Cost: <span id="license_cost" class="font-medium text-gray-900"></span></p>
+                        <p>Activated: <span id="license_activated" class="font-medium text-gray-900"></span></p>
+                        <p>Expires: <span id="license_expires" class="font-medium text-gray-900"></span></p>
+                        <p>Max Employees: <span id="license_users" class="font-medium text-gray-900"></span></p>
+                    </div>
+                </div>
             </div>
 
-            <form id="licenseKeyForm" method="POST" action="">
+            <form id="licenseKeyForm" onsubmit="return submitLicenseKey(event)">
                 @csrf
                 <div class="mb-4">
                     <label for="license_key" class="block text-sm font-medium text-gray-700 mb-2">License Key</label>
@@ -210,9 +243,7 @@
                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                            placeholder="Enter license key or leave empty to remove"></textarea>
                     <p class="mt-1 text-xs text-gray-500">Leave empty to deactivate the license. License key must be from the system license list.</p>
-                    @if($errors->has('license_key'))
-                        <p class="mt-1 text-sm text-red-600">{{ $errors->first('license_key') }}</p>
-                    @endif
+                    <p id="license_key_error" class="mt-1 text-sm text-red-600 hidden"></p>
                 </div>
 
                 <div class="flex justify-end space-x-3">
@@ -258,6 +289,7 @@
                 if (data.success) {
                     // Populate the edit form
                     document.getElementById('edit_name').value = data.company.name;
+                    document.getElementById('edit_code').value = data.company.code || '';
                     document.getElementById('editCompanyForm').action = `/companies/${companyId}`;
                     
                     // Show the modal
@@ -492,9 +524,34 @@
         }
 
         function openLicenseKeyModal(companyId, companyName, currentLicenseKey) {
-            document.getElementById('license_company_name').textContent = companyName;
             document.getElementById('license_key').value = currentLicenseKey || '';
-            document.getElementById('licenseKeyForm').action = `/companies/${companyId}/license-key`;
+            document.getElementById('licenseKeyForm').dataset.companyId = companyId;
+            
+            // Clear any previous errors
+            document.getElementById('license_key_error').classList.add('hidden');
+            document.getElementById('license_key_error').textContent = '';
+            
+            // Hide license info by default
+            document.getElementById('license_info').classList.add('hidden');
+            
+            // If there's a current license key, fetch and display its information
+            if (currentLicenseKey) {
+                fetch(`/api/license-info/${encodeURIComponent(currentLicenseKey)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.license) {
+                            const license = data.license;
+                            document.getElementById('license_company_name_display').textContent = companyName;
+                            document.getElementById('license_cost').textContent = license.cost || 'N/A';
+                            document.getElementById('license_activated').textContent = license.activated_at || 'N/A';
+                            document.getElementById('license_expires').textContent = license.expires_at || 'N/A';
+                            document.getElementById('license_users').textContent = license.max_employees || 'N/A';
+                            document.getElementById('license_info').classList.remove('hidden');
+                        }
+                    })
+                    .catch(error => console.error('Error fetching license info:', error));
+            }
+            
             document.getElementById('licenseKeyModal').classList.remove('hidden');
             document.getElementById('license_key').focus();
         }
@@ -502,7 +559,56 @@
         function closeLicenseKeyModal() {
             document.getElementById('licenseKeyModal').classList.add('hidden');
             document.getElementById('licenseKeyForm').reset();
-            document.getElementById('license_key-error').classList.add('hidden');
+            document.getElementById('license_key_error').classList.add('hidden');
+        }
+
+        function submitLicenseKey(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const companyId = form.dataset.companyId;
+            const licenseKey = document.getElementById('license_key').value;
+            const errorElement = document.getElementById('license_key_error');
+            const submitBtn = document.getElementById('updateLicenseBtn');
+            
+            // Clear previous errors
+            errorElement.classList.add('hidden');
+            errorElement.textContent = '';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Updating...';
+            
+            // Submit via AJAX
+            fetch(`/companies/${companyId}/license-key`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ license_key: licenseKey })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.errors && data.errors.license_key) {
+                    // Show error in modal without closing
+                    errorElement.textContent = data.errors.license_key[0];
+                    errorElement.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Update License';
+                } else {
+                    // Success - close modal and reload page
+                    closeLicenseKeyModal();
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                errorElement.textContent = 'An error occurred. Please try again.';
+                errorElement.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update License';
+            });
+            
+            return false;
         }
 
         // Close modal on Escape key

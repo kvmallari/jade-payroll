@@ -32,12 +32,20 @@ class ValidateLicense
             return $next($request);
         }
 
-        // Skip license validation for authenticated users without a company (super admin)
-        $user = auth()->user();
-        if ($user && !$user->company_id) {
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        // ONLY Super Admin role skips license validation
+        if ($user && $user->hasRole('Super Admin')) {
             return $next($request);
         }
 
+        // Company users (System Administrator, HR, etc.) don't need system license validation
+        // They are validated by CheckCompanyLicense middleware instead
+        if ($user && $user->company_id) {
+            return $next($request);
+        }
+
+        // For any other case, validate system license
         $validation = LicenseService::validateLicense();
 
         if (!$validation['valid']) {

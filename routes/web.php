@@ -19,9 +19,15 @@ use App\Http\Controllers\TimeScheduleController;
 use App\Http\Controllers\DayScheduleController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\CompanySelectorController;
+use App\Http\Controllers\LicenseController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+
+// API route for license information
+Route::get('/api/license-info/{licenseKey}', [LicenseController::class, 'getLicenseInfo'])
+    ->middleware('auth')
+    ->name('api.license-info');
 
 Route::get('/', function () {
     // Show login page directly

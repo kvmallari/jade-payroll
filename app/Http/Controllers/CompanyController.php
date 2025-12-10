@@ -34,6 +34,22 @@ class CompanyController extends Controller
 
         $companies = $query->latest('created_at')->paginate(10)->withQueryString();
 
+        // Validate license status for each company
+        foreach ($companies as $company) {
+            if ($company->license_key) {
+                $license = \App\Models\SystemLicense::where('license_key', $company->license_key)->first();
+
+                // If license doesn't exist or is expired, clear it
+                if (!$license) {
+                    $company->update(['license_key' => null]);
+                    $company->license_key = null; // Update in-memory for display
+                } elseif ($license->expires_at && $license->expires_at->isPast()) {
+                    // Keep the license key but mark as expired for display
+                    $company->license_expired = true;
+                }
+            }
+        }
+
         return view('companies.index', compact('companies'));
     }
 
@@ -52,27 +68,13 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'nullable|string|max:50|unique:companies,code',
+            'code' => 'required|string|max:50|unique:companies,code',
             'description' => 'nullable|string',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
-
-        // Auto-generate code from name if not provided
-        if (empty($validated['code'])) {
-            $baseCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $validated['name']), 0, 10));
-            $code = $baseCode;
-            $counter = 1;
-
-            while (Company::where('code', $code)->exists()) {
-                $code = $baseCode . $counter;
-                $counter++;
-            }
-
-            $validated['code'] = $code;
-        }
 
         // Set default active status to true (active)
         if (!isset($validated['is_active'])) {
@@ -147,13 +149,55 @@ class CompanyController extends Controller
         // If license key is provided, validate it exists in system licenses
         if (!empty($validated['license_key'])) {
             if (!\App\Services\LicenseService::isValidLicenseKey($validated['license_key'])) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'errors' => [
+                            'license_key' => ['Invalid license key. The license key must be listed in the system. Run "php artisan license:list" to see available licenses.']
+                        ]
+                    ], 422);
+                }
                 return back()
                     ->withInput()
                     ->withErrors(['license_key' => 'Invalid license key. The license key must be listed in the system. Run "php artisan license:list" to see available licenses.']);
             }
+
+            // Check if license key is already being used by another company
+            $existingCompany = Company::where('license_key', $validated['license_key'])
+                ->where('id', '!=', $company->id)
+                ->first();
+
+            if ($existingCompany) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'errors' => [
+                            'license_key' => ['License key is already in use by "' . $existingCompany->name]
+                        ]
+                    ], 422);
+                }
+                return back()
+                    ->withInput()
+                    ->withErrors(['license_key' => 'License key is already in use by "' . $existingCompany->name]);
+            }
         }
 
         $company->update(['license_key' => $validated['license_key']]);
+
+        // If a license key is set, mark it as active and set expiration
+        if (!empty($validated['license_key'])) {
+            $license = \App\Models\SystemLicense::where('license_key', $validated['license_key'])->first();
+            if ($license && !$license->is_active) {
+                $durationDays = $license->plan_info['duration_days'] ?? 30;
+                $license->update([
+                    'is_active' => true,
+                    'activated_at' => now(),
+                    'expires_at' => now()->addDays($durationDays)
+                ]);
+            }
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'License key updated successfully.']);
+        }
 
         return redirect()->route('companies.index')
             ->with('success', 'License key updated successfully.');

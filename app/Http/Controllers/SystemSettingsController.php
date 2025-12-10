@@ -38,9 +38,22 @@ class SystemSettingsController extends Controller
             ? 'local'
             : $currentDomain;
 
-        // Get company-specific license information (using license_key from companies table)
-        $currentLicense = SystemLicense::current(); // This will still work for now
-        $employeeCount = Employee::where('company_id', $user->company_id)->count();
+        // Get license information based on user role
+        $currentLicense = null;
+        $employeeCount = 0;
+
+        if ($user->hasRole('System Administrator') && $company) {
+            // For System Administrator, show company license details
+            if ($company->license_key) {
+                // Find the license in system_licenses table
+                $currentLicense = SystemLicense::where('license_key', $company->license_key)->first();
+            }
+            $employeeCount = Employee::where('company_id', $user->company_id)->count();
+        } elseif ($user->hasRole('Super Admin')) {
+            // For Super Admin, show system-wide license
+            $currentLicense = SystemLicense::current();
+            $employeeCount = Employee::count();
+        }
 
         $settings = [
             'appearance' => [

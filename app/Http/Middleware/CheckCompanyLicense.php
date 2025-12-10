@@ -30,7 +30,8 @@ class CheckCompanyLicense
         }
 
         // All other users must have a company with a valid license
-        $company = $user->company;
+        // Refresh the company relationship to get the latest data from database
+        $company = $user->company()->first();
 
         // Check if company exists and has a license key
         if (!$company || empty($company->license_key)) {
@@ -46,6 +47,37 @@ class CheckCompanyLicense
             // Redirect to license activation page
             return redirect()->route('license.activate')
                 ->with('warning', 'Please activate your company license to access the system.');
+        }
+
+        // Validate license exists in system_licenses table
+        $license = \App\Models\SystemLicense::where('license_key', $company->license_key)->first();
+
+        if (!$license) {
+            // License doesn't exist in system - clear it from company
+            $company->update(['license_key' => null]);
+
+            // Allow access to logout
+            if ($request->routeIs('logout')) {
+                return $next($request);
+            }
+
+            return redirect()->route('license.activate')
+                ->with('error', 'Company license is invalid or has been deleted. Please activate a new license.');
+        }
+
+        // Check if license is expired
+        if ($license->expires_at && $license->expires_at->isPast()) {
+            // Allow access to license activation routes and logout
+            if (
+                $request->routeIs('license.activate') ||
+                $request->routeIs('license.activate.store') ||
+                $request->routeIs('logout')
+            ) {
+                return $next($request);
+            }
+
+            return redirect()->route('license.activate')
+                ->with('warning', 'Your company license has expired. Please activate a new license key.');
         }
 
         return $next($request);

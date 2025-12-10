@@ -303,8 +303,11 @@ class GovernmentFormsController extends Controller
         // Paginate with query string preservation
         $employees = $query->paginate($perPage)->withQueryString();
 
-        // Get departments for filter dropdown
-        $departments = Department::active()->get();
+        // Get departments for filter dropdown - scoped by company
+        $companyId = Auth::user()->isSuperAdmin()
+            ? ($company->id ?? null)
+            : Auth::user()->company_id;
+        $departments = Department::where('company_id', $companyId)->active()->get();
 
         // Return JSON for AJAX requests
         if ($request->wantsJson() || $request->ajax()) {
